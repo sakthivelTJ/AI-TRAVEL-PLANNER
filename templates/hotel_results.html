@@ -18,12 +18,12 @@
                     </ol>
                 </nav>
                 <h1 class="display-4 fw-bold text-white mb-3">
-                    Hotels in {{ location }}
+                    Hotels in {{ location or 'your destination' }}
                 </h1>
                 <div class="d-flex flex-wrap gap-3 text-white">
                     <div class="search-detail">
                         <i class="bi bi-people me-2"></i>
-                        {{ guests }} guests
+                        {{ guests or 'N/A' }} guests
                     </div>
                     <div class="search-detail">
                         <i class="bi bi-wallet2 me-2"></i>

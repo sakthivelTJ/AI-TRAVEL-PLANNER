@@ -1,8 +1,9 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash
-import google.generativeai as genai
+from google import genai
 import requests
 import json
 import os
+import time
 from datetime import datetime
 from markupsafe import Markup
 import markdown
@@ -14,20 +15,21 @@ app = Flask(__name__)
 app.secret_key = os.urandom(24)  # For session management
 
 # Configure Supabase
-supabase: Client = create_client(
-    os.getenv("VITE_SUPABASE_URL"),
-    os.getenv("VITE_SUPABASE_ANON_KEY")
-)
+supabase_url = os.getenv("VITE_SUPABASE_URL") or os.getenv("SUPABASE_URL")
+supabase_key = os.getenv("VITE_SUPABASE_ANON_KEY") or os.getenv("SUPABASE_ANON_KEY")
+
+if supabase_url and supabase_key:
+    supabase: Client = create_client(supabase_url, supabase_key)
+else:
+    print("Warning: Supabase credentials are not configured. Database features are disabled.")
+    supabase = None
 
 # Configure Gemini API
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel(
-    model_name="gemini-2.5-flash",  # Using newer model
-    generation_config={
-        "temperature": DEFAULT_TEMPERATURE,
-        "max_output_tokens": DEFAULT_MAX_OUTPUT_TOKENS
-    }
-)
+if GEMINI_API_KEY:
+    client = genai.Client(api_key=GEMINI_API_KEY)
+else:
+    print("Warning: GEMINI_API_KEY is not configured. Gemini generation is disabled.")
+    client = None
 
 # Configure Markdown with extensions
 md = markdown.Markdown(extensions=['extra', 'nl2br', 'sane_lists', 'fenced_code', 'tables'])
@@ -115,14 +117,42 @@ fallback_content = {
             ]
 }
 
+def call_gemini_with_retry(prompt, max_retries=3):
+    """Call Gemini API with exponential backoff retry on transient errors."""
+    for attempt in range(max_retries):
+        try:
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt,
+                config={
+                    "temperature": DEFAULT_TEMPERATURE,
+                    "max_output_tokens": DEFAULT_MAX_OUTPUT_TOKENS
+                }
+            )
+            if not response or not response.text:
+                raise ValueError("Empty response from Gemini API")
+            return response.text
+        except Exception as e:
+            error_str = str(e).lower()
+            is_retryable = any(code in error_str for code in ["429", "500", "503", "timeout", "rate", "quota", "overloaded"])
+            if is_retryable and attempt < max_retries - 1:
+                wait = 2 ** attempt  # 1s, 2s, 4s
+                print(f"[RETRY] Attempt {attempt + 1} failed: {e}. Retrying in {wait}s...")
+                time.sleep(wait)
+            else:
+                raise
+
 def format_markdown_content(content):
     """Format the content with proper markdown structure"""
-    # Convert markdown to HTML using the markdown library
-    html_content = md.convert(content)
-    return html_content
+    md.reset()
+    return md.convert(content)
 
 def search_travel_info(query, destination):
     """Enhanced Tavily API to search for travel information"""
+    if not TAVILY_API_KEY:
+        print("Warning: TAVILY_API_KEY is not configured. Skipping travel info search.")
+        return []
+
     url = "https://api.tavily.com/search"
     
     # Craft more specific search queries for better results
@@ -169,6 +199,10 @@ def search_travel_info(query, destination):
 
 def save_travel_plan(travel_params, content, sources):
     """Save the travel plan to Supabase"""
+    if not supabase:
+        print("Supabase not configured; skipping travel plan save.")
+        return None
+
     try:
         data = {
             "destination": travel_params['destination'],
@@ -188,8 +222,13 @@ def save_travel_plan(travel_params, content, sources):
         print(f"Error saving travel plan to Supabase: {e}")
         return None
 
+
 def get_travel_plan(plan_id):
     """Retrieve a travel plan from Supabase"""
+    if not supabase:
+        print("Supabase not configured; cannot retrieve travel plan.")
+        return None
+
     try:
         result = supabase.table('travel_plans').select("*").eq('id', plan_id).execute()
         return result.data[0] if result.data else None
@@ -207,9 +246,36 @@ def format_date(date_str):
     except Exception:
         return None
 
+
+def convert_usd_to_inr(text, rate=82.0):
+    """Convert USD amounts in text to INR using a fixed rate and change currency symbol."""
+    import re
+
+    def convert_match(match):
+        usd_str = match.group(1)
+        try:
+            usd_value = float(usd_str)
+            inr_value = usd_value * rate
+            if inr_value.is_integer():
+                inr_display = f"₹{int(inr_value):,}"
+            else:
+                inr_display = f"₹{inr_value:,.2f}"
+            return inr_display
+        except Exception:
+            return match.group(0)
+
+    text = re.sub(r"\$([0-9]+(?:\.[0-9]+)?)", convert_match, text)
+    text = re.sub(r"\$(XX+)", r"₹\1", text)
+    text = text.replace("USD", "INR").replace("usd", "inr")
+    return text
+
+
 def generate_travel_plan(travel_params):
     """Generate a travel plan using Gemini API with enhanced prompt"""
-    
+    if not client:
+        print("Warning: Gemini client is not configured. Returning fallback content.")
+        return fallback_content
+
     # Search for additional information using Tavily
     search_results = search_travel_info(
         f"travel guide for {travel_params['destination']}", 
@@ -248,14 +314,14 @@ def generate_travel_plan(travel_params):
 
     ## Day-by-Day Itinerary
 
-    IMPORTANT: Create a detailed itinerary for EACH of the {travel_params['days']} days. For each day include:
+    IMPORTANT: Create a detailed itinerary for EACH of the {travel_params['days']} days. For each day include costs in Indian Rupees (INR, ₹).
 
     ### Day 1: [Theme/Focus]
     **Morning (8:00 AM - 12:00 PM)**
     - Activity 1: [Specific location/attraction]
       * Details and tips
       * Estimated time: X hours
-      * Cost: $XX
+      * Cost: ₹XX (approx)
     - Activity 2: [Another location]
       * Details and tips
 
@@ -274,7 +340,7 @@ def generate_travel_plan(travel_params):
     ## Accommodation Recommendations
     - Option 1: [Hotel/Airbnb name]
       * Location and why it's good
-      * Price range: $XX-$XX per night
+      * Price range: ₹XX-₹XX per night
     - Option 2: [Alternative]
     - Option 3: [Budget option]
 
@@ -291,11 +357,11 @@ def generate_travel_plan(travel_params):
     - Estimated costs
 
     ## Budget Breakdown
-    - Accommodation: $XX per night x {travel_params['days']} nights
-    - Meals: $XX per day x {travel_params['days']} days
-    - Activities & Attractions: $XX total
-    - Transportation: $XX total
-    - **Total Estimated Cost: $XXX - $XXX**
+    - Accommodation: ₹XX per night x {travel_params['days']} nights
+    - Meals: ₹XX per day x {travel_params['days']} days
+    - Activities & Attractions: ₹XX total
+    - Transportation: ₹XX total
+    - **Total Estimated Cost: ₹XXX - ₹XXX**
 
     ## Local Tips & Essentials
     - Best time to visit
@@ -311,21 +377,16 @@ def generate_travel_plan(travel_params):
     """
     
     try:
-        response = model.generate_content(prompt)
-        raw_text = response.text
+        raw_text = call_gemini_with_retry(prompt)
         
-        # DEBUG: Log if itinerary section exists in response
-        has_itinerary = "Itinerary" in raw_text or "Day" in raw_text
-        print(f"[DEBUG] AI Response length: {len(raw_text)}")
-        print(f"[DEBUG] Has Itinerary section: {has_itinerary}")
-        if not has_itinerary:
-            print(f"[DEBUG] Raw response preview: {raw_text[:500]}...")
-        
-        # Save the plan to Supabase
-        saved_plan = save_travel_plan(travel_params, raw_text, sources)
+        # Convert prices from USD to INR and replace symbols in the generated text
+        converted_text = convert_usd_to_inr(raw_text)
+
+        # Save the plan to Supabase (with INR content)
+        saved_plan = save_travel_plan(travel_params, converted_text, sources)
         
         # Convert markdown to HTML using the markdown library
-        html_content = format_markdown_content(raw_text)
+        html_content = format_markdown_content(converted_text)
         
         return {
             "content": html_content,
@@ -333,10 +394,19 @@ def generate_travel_plan(travel_params):
             "plan_id": saved_plan['id'] if saved_plan else None
         }
     except Exception as e:
-        print(f"[DEBUG] Gemini API Error: {e}")
-        print(f"[DEBUG] Error type: {type(e).__name__}")
-        print(f"[DEBUG] Full traceback: {traceback.format_exc()}")
-        print(f"[DEBUG] Returning fallback content (NO ITINERARY)")
+        error_msg = str(e)
+        print(f"[ERROR] Gemini API Error: {error_msg}")
+        print(f"[ERROR] Error type: {type(e).__name__}")
+        print(f"[ERROR] Full traceback: {traceback.format_exc()}")
+        
+        # Return fallback with error context
+        if "429" in error_msg or "quota" in error_msg.lower() or "rate" in error_msg.lower():
+            print("[ERROR] Rate limit or quota exceeded. Returning fallback.")
+        elif "401" in error_msg or "403" in error_msg or "invalid" in error_msg.lower():
+            print("[ERROR] Invalid API key. Check your GEMINI_API_KEY in .env file.")
+        else:
+            print("[ERROR] Unexpected error. Returning fallback.")
+        
         return fallback_content
 
 @app.route('/')
@@ -439,6 +509,15 @@ def regenerate_plan():
 @app.route('/plans')
 def list_plans():
     """Route to display all saved travel plans"""
+    if not supabase:
+        return render_template('plans.html',
+                             plans=[],
+                             current_page=1,
+                             total_pages=1,
+                             prev_page=None,
+                             next_page=None,
+                             error="Database is not configured.")
+
     try:
         page = request.args.get('page', 1, type=int)
         per_page = 9  # Number of plans per page
@@ -478,6 +557,16 @@ def list_plans():
 
 @app.route('/travel-guides')
 def travel_guides():
+    if not supabase:
+        return render_template('travel_guides.html',
+                             guides=[],
+                             categories=set(),
+                             current_page=1,
+                             total_pages=1,
+                             prev_page=None,
+                             next_page=None,
+                             error="Database is not configured.")
+
     try:
         page = request.args.get('page', 1, type=int)
         per_page = 9  # Number of guides per page
@@ -518,6 +607,10 @@ def travel_guides():
 @app.route('/travel-guides/create', methods=['GET', 'POST'])
 def create_guide():
     if request.method == 'POST':
+        if not supabase:
+            flash('Database is not configured. Cannot create guide.', 'error')
+            return render_template('create_guide.html', error="Database is not configured.")
+
         try:
             data = {
                 'title': request.form['title'],
@@ -546,6 +639,10 @@ def create_guide():
 
 @app.route('/travel-guides/<guide_id>')
 def view_guide(guide_id):
+    if not supabase:
+        print("Supabase not configured; cannot view travel guide.")
+        return redirect(url_for('travel_guides'))
+
     try:
         result = supabase.table('travel_guides').select("*").eq('id', guide_id).single().execute()
         if result.data:
@@ -558,6 +655,14 @@ def view_guide(guide_id):
 @app.route('/hotel-search', methods=['GET', 'POST'])
 def hotel_search():
     if request.method == 'POST':
+        if not supabase:
+            flash('Database is not configured. Hotel search is unavailable.', 'error')
+            return redirect(url_for('hotel_search'))
+
+        if not TAVILY_API_KEY:
+            flash('Tavily API key is not configured. Hotel search is unavailable.', 'error')
+            return redirect(url_for('hotel_search'))
+
         try:
             location = request.form.get('location')
             guests = request.form.get('guests', '2')
@@ -661,9 +766,7 @@ def hotel_search():
             {json.dumps(hotel_results.get('results', []), indent=2)}
             """
 
-            response = model.generate_content(prompt)
-            if not response or not response.text:
-                raise Exception("No response from Gemini API")
+            hotel_text = call_gemini_with_retry(prompt)
 
             # Save the search to the database
             search_data = {
@@ -671,7 +774,7 @@ def hotel_search():
                 'guests': int(guests),
                 'preferences': preferences,
                 'budget': budget,
-                'recommendations': response.text,
+                'recommendations': hotel_text,
                 'search_results': hotel_results.get('results', [])
             }
             
@@ -697,6 +800,15 @@ def hotel_search():
 
 @app.route('/hotel-searches')
 def hotel_searches():
+    if not supabase:
+        return render_template('hotel_searches.html',
+                             searches=[],
+                             current_page=1,
+                             total_pages=1,
+                             prev_page=None,
+                             next_page=None,
+                             error="Database is not configured.")
+
     try:
         page = request.args.get('page', 1, type=int)
         per_page = 6  # Number of searches per page
@@ -736,14 +848,29 @@ def hotel_searches():
 
 @app.route('/hotel-search/<search_id>')
 def view_hotel_search(search_id):
+    if not supabase:
+        print("Supabase not configured; cannot view hotel search.")
+        return redirect(url_for('hotel_searches'))
+
     try:
         result = supabase.table('hotel_searches').select("*").eq('id', search_id).single().execute()
         if result.data:
+            search_data = result.data
+
+            # Set fallback values so header section does not go blank
+            search_data['location'] = search_data.get('location') or 'your destination'
+            search_data['guests'] = search_data.get('guests') or 'N/A'
+            search_data['budget'] = search_data.get('budget') or 'N/A'
+            search_data['preferences'] = search_data.get('preferences', '')
+
             # Convert markdown to HTML if recommendations exist
-            if result.data.get('recommendations'):
-                recommendations = md.convert(result.data['recommendations'])
-                result.data['recommendations'] = Markup(recommendations)
-            return render_template('view_hotel_search.html', search=result.data)
+            if search_data.get('recommendations'):
+                recommendations = md.convert(search_data['recommendations'])
+                search_data['recommendations'] = Markup(recommendations)
+            else:
+                search_data['recommendations'] = Markup('<p class="text-muted">No hotel recommendations available yet. Please try another search.</p>')
+
+            return render_template('view_hotel_search.html', search=search_data)
         return redirect(url_for('hotel_searches'))
     except Exception as e:
         print(f"Error fetching hotel search: {e}")
