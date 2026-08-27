@@ -171,110 +171,59 @@
 
 {% block extra_css %}
 <style>
+/* Hero section style overrides */
 .hotel-search-hero {
-    background: linear-gradient(135deg, #4F46E5, #7C3AED);
-    min-height: 50vh;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark)) !important;
+    min-height: 45vh !important;
 }
 
 .hero-bg {
     background: url('https://source.unsplash.com/random/1920x1080/?luxury-hotel') center/cover;
-    opacity: 0.2;
+    opacity: 0.15;
 }
 
-.form-control, .form-select {
-    border: 1px solid #E5E7EB;
-    border-radius: 1rem;
-    padding: 1rem 1.25rem;
-    transition: all 0.3s ease;
-}
-
-.form-control:focus, .form-select:focus {
-    border-color: #4F46E5;
-    box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
-}
-
-.input-group-text {
-    border-radius: 1rem 0 0 1rem;
-    border: 1px solid #E5E7EB;
-    padding: 0.75rem 1.25rem;
-}
-
-.input-group .form-control {
-    border-radius: 0 1rem 1rem 0;
-}
-
-.btn-primary {
-    background: linear-gradient(135deg, #4F46E5, #7C3AED);
-    border: none;
-    transition: all 0.3s ease;
-}
-
-.btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(79, 70, 229, 0.3);
-}
-
-.feature-icon {
-    width: 48px;
-    height: 48px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-/* Loading Animation Styles */
-.loading-animation {
-    position: relative;
-    width: 120px;
-    height: 120px;
-    margin: 0 auto;
-}
-
-.hotel-loader {
-    position: relative;
-    width: 100%;
-    height: 100%;
-}
-
+/* Loading Waves & Modal Styles */
 .hotel-icon {
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
     font-size: 2.5rem;
-    color: #4F46E5;
+    color: var(--primary-light);
     z-index: 2;
 }
 
 .search-waves {
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    border: 4px solid #4F46E5;
+    inset: 0;
+    border: 4px solid var(--primary);
     border-radius: 50%;
-    animation: pulse 1.5s ease-out infinite;
+    animation: searchPulse 1.8s ease-out infinite;
+    box-shadow: var(--accent-glow);
 }
 
-@keyframes pulse {
+@keyframes searchPulse {
     0% {
-        transform: scale(0.5);
+        transform: scale(0.6);
         opacity: 1;
     }
+    15% {
+        box-shadow: 0 0 20px var(--primary-glow);
+    }
     100% {
-        transform: scale(1.5);
+        transform: scale(1.6);
         opacity: 0;
     }
 }
 
-/* Loading Steps Styles */
+/* Step list overrides */
 .step-item {
     padding: 1rem;
-    border-radius: 0.5rem;
-    background: rgba(79, 70, 229, 0.1);
+    border-radius: var(--radius);
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-color);
     margin-bottom: 1rem;
-    transition: all 0.3s ease;
+    transition: var(--transition);
 }
 
 .step-icon {
@@ -283,9 +232,9 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: white;
+    background: rgba(255, 255, 255, 0.05);
     border-radius: 50%;
-    color: #4F46E5;
+    color: var(--text-muted);
 }
 
 .step-status {
@@ -297,21 +246,23 @@
 }
 
 .step-item.active {
-    background: rgba(79, 70, 229, 0.2);
+    background: rgba(99, 102, 241, 0.08) !important;
+    border-color: var(--primary) !important;
+}
+
+.step-item.active .step-icon {
+    background: var(--primary) !important;
+    color: white !important;
 }
 
 .step-item.completed {
-    background: rgba(34, 197, 94, 0.1);
+    background: rgba(16, 185, 129, 0.08) !important;
+    border-color: var(--success) !important;
 }
 
 .step-item.completed .step-icon {
-    color: #22C55E;
-}
-
-@media (max-width: 768px) {
-    .hotel-search-hero {
-        min-height: 40vh;
-    }
+    background: var(--success) !important;
+    color: white !important;
 }
 </style>
 {% endblock %}

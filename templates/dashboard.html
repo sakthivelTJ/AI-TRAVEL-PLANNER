@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+{% block title %} - Dashboard{% endblock %}
+
+{% block content %}
+<!-- Dashboard Hero Section -->
+<section class="dashboard-hero position-relative overflow-hidden py-5 bg-primary text-white">
+    <div class="container position-relative z-1 py-4">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <span class="badge bg-white-20 text-white px-3 py-2 mb-3 rounded-pill">Welcome Back</span>
+                <h1 class="display-5 fw-bold mb-2">{{ session['user']['email'] }}</h1>
+                <p class="lead mb-0 text-white-75">Manage your saved travel plans, hotels, and custom travel guides here.</p>
+            </div>
+            <div class="col-md-4 text-md-end mt-4 mt-md-0">
+                <a href="{{ url_for('planner') }}" class="btn btn-light btn-lg fw-medium shadow-sm">
+                    <i class="bi bi-calendar-plus me-2"></i>Create New Plan
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Dashboard Main Content -->
+<div class="container py-5">
+    <!-- Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <!-- Dashboard Navigation Tabs -->
+    <ul class="nav nav-pills nav-fill mb-5 p-2 rounded-pill" id="dashboardTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active rounded-pill py-3 fw-bold" id="plans-tab" data-bs-toggle="tab" data-bs-target="#plans" type="button" role="tab" aria-controls="plans" aria-selected="true">
+                <i class="bi bi-journal-text me-2"></i>My Travel Plans ({{ plans|length }})
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-pill py-3 fw-bold" id="hotels-tab" data-bs-toggle="tab" data-bs-target="#hotels" type="button" role="tab" aria-controls="hotels" aria-selected="false">
+                <i class="bi bi-house-heart me-2"></i>My Hotel Searches ({{ hotels|length }})
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-pill py-3 fw-bold" id="guides-tab" data-bs-toggle="tab" data-bs-target="#guides" type="button" role="tab" aria-controls="guides" aria-selected="false">
+                <i class="bi bi-compass me-2"></i>My Guides ({{ guides|length }})
+            </button>
+        </li>
+    </ul>
+
+    <!-- Tabs Content -->
+    <div class="tab-content" id="dashboardTabsContent">
+        
+        <!-- Travel Plans Tab -->
+        <div class="tab-pane fade show active" id="plans" role="tabpanel" aria-labelledby="plans-tab">
+            {% if plans %}
+                <div class="row g-4">
+                    {% for plan in plans %}
+                        <div class="col-md-6 col-lg-4">
+                            <div class="plan-card h-100 card shadow-sm border-0 position-relative overflow-hidden">
+                                <div class="plan-overlay position-absolute top-0 end-0 p-3 z-1">
+                                    <span class="badge bg-primary px-3 py-2 rounded-pill shadow-sm">{{ plan.days }} Days</span>
+                                </div>
+                                <div class="card-body p-4 pt-5">
+                                    <h4 class="fw-bold mb-3 text-primary">{{ plan.destination }}</h4>
+                                    <p class="text-muted small mb-4">
+                                        <i class="bi bi-calendar-event me-2"></i>Created: {{ plan.created_at.strftime('%B %d, %Y') if plan.created_at else 'Recently' }}
+                                    </p>
+                                    <div class="d-flex flex-column gap-2 mb-4 bg-light p-3 rounded-3">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <i class="bi bi-people text-secondary"></i>
+                                            <span class="small">{{ plan.people }} Traveler(s)</span>
+                                        </div>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <i class="bi bi-wallet2 text-secondary"></i>
+                                            <span class="small">{{ plan.budget }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="d-grid">
+                                        <a href="{{ url_for('generate_plan') }}?plan_id={{ plan.id }}" class="btn btn-outline-primary py-2.5">
+                                            <i class="bi bi-eye me-2"></i>View Itinerary
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center py-5 bg-light rounded-4">
+                    <i class="bi bi-journal-text display-3 text-muted mb-3 d-block"></i>
+                    <h4 class="fw-bold">No Travel Plans Saved Yet</h4>
+                    <p class="text-muted mb-4">Generate your first custom AI travel plan now!</p>
+                    <a href="{{ url_for('planner') }}" class="btn btn-primary px-4 py-2.5">
+                        <i class="bi bi-magic me-2"></i>Create First Plan
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Hotel Searches Tab -->
+        <div class="tab-pane fade" id="hotels" role="tabpanel" aria-labelledby="hotels-tab">
+            {% if hotels %}
+                <div class="row g-4">
+                    {% for hotel in hotels %}
+                        <div class="col-md-6 col-lg-4">
+                            <div class="card shadow-sm border-0 h-100">
+                                <div class="card-body p-4">
+                                    <div class="d-flex justify-content-between align-items-start mb-3">
+                                        <h4 class="fw-bold text-primary mb-0">{{ hotel.location }}</h4>
+                                        <span class="badge bg-success-subtle text-success px-2.5 py-1.5 rounded-pill shadow-sm">{{ hotel.budget|capitalize }}</span>
+                                    </div>
+                                    <p class="text-muted small mb-4">
+                                        <i class="bi bi-calendar-event me-2"></i>Searched: {{ hotel.created_at.strftime('%B %d, %Y') if hotel.created_at else 'Recently' }}
+                                    </p>
+                                    <div class="d-flex flex-column gap-2 mb-4 bg-light p-3 rounded-3">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <i class="bi bi-people text-secondary"></i>
+                                            <span class="small">{{ hotel.guests }} Guests</span>
+                                        </div>
+                                        {% if hotel.preferences %}
+                                        <div class="d-flex align-items-center gap-2">
+                                            <i class="bi bi-star text-secondary"></i>
+                                            <span class="small text-truncate" style="max-width: 200px;">{{ hotel.preferences }}</span>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="d-grid">
+                                        <a href="{{ url_for('view_hotel_search', search_id=hotel.id) }}" class="btn btn-outline-primary py-2.5">
+                                            <i class="bi bi-eye me-2"></i>View Recommendations
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center py-5 bg-light rounded-4">
+                    <i class="bi bi-house-heart display-3 text-muted mb-3 d-block"></i>
+                    <h4 class="fw-bold">No Hotel Recommendations Found</h4>
+                    <p class="text-muted mb-4">Search hotels near your destinations.</p>
+                    <a href="{{ url_for('hotel_search') }}" class="btn btn-primary px-4 py-2.5">
+                        <i class="bi bi-search me-2"></i>Search Hotels
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Travel Guides Tab -->
+        <div class="tab-pane fade" id="guides" role="tabpanel" aria-labelledby="guides-tab">
+            {% if guides %}
+                <div class="row g-4">
+                    {% for guide in guides %}
+                        <div class="col-md-6 col-lg-4">
+                            <div class="card shadow-sm border-0 h-100 position-relative overflow-hidden">
+                                <div class="card-body p-4 pt-5">
+                                    <div class="guide-icon bg-primary-subtle text-primary rounded-circle mb-3 d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                                        <i class="bi bi-{{ guide.icon or 'compass' }} fs-4"></i>
+                                    </div>
+                                    <h4 class="fw-bold mb-2">{{ guide.title }}</h4>
+                                    <span class="badge bg-secondary mb-3">{{ guide.category }}</span>
+                                    <p class="text-muted small mb-4">{{ guide.excerpt }}</p>
+                                    <div class="d-grid">
+                                        <a href="{{ url_for('view_guide', guide_id=guide.id) }}" class="btn btn-outline-primary py-2.5">
+                                            <i class="bi bi-book me-2"></i>Read Guide
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center py-5 bg-light rounded-4">
+                    <i class="bi bi-compass display-3 text-muted mb-3 d-block"></i>
+                    <h4 class="fw-bold">No Travel Guides Published</h4>
+                    <p class="text-muted mb-4">Write and share a travel guide for others!</p>
+                    <a href="{{ url_for('create_guide') }}" class="btn btn-primary px-4 py-2.5">
+                        <i class="bi bi-plus-circle me-2"></i>Create Guide
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.dashboard-hero {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark)) !important;
+}
+#dashboardTabs {
+    background: rgba(255, 255, 255, 0.02) !important;
+    border: 1px solid var(--border-color) !important;
+}
+[data-theme="light"] #dashboardTabs {
+    background: rgba(0, 0, 0, 0.02) !important;
+}
+#dashboardTabs .nav-link {
+    color: var(--text-muted) !important;
+    border: none;
+    transition: var(--transition);
+}
+#dashboardTabs .nav-link:hover {
+    color: var(--primary-light) !important;
+    background-color: rgba(99, 102, 241, 0.08) !important;
+}
+#dashboardTabs .nav-link.active {
+    color: white !important;
+    background-color: var(--primary) !important;
+    box-shadow: 0 4px 15px var(--primary-glow) !important;
+}
+</style>
+{% endblock %}

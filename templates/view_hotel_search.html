@@ -120,29 +120,23 @@
 
 {% block extra_css %}
 <style>
-:root {
-    --primary-gradient: linear-gradient(135deg, #4F46E5, #7C3AED);
-    --primary-color: #4F46E5;
-    --primary-dark: #4338CA;
-    --primary-light: #818CF8;
-    --transition: all 0.3s ease;
-}
-
 .hotel-hero {
-    background: linear-gradient(135deg, #4F46E5, #7C3AED);
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark)) !important;
     min-height: 40vh;
 }
 
 .hero-bg {
     background: url('https://source.unsplash.com/random/1920x1080/?{{ search.location }}-hotel') center/cover;
-    opacity: 0.2;
+    opacity: 0.15;
 }
 
 .search-detail {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.2);
     padding: 0.5rem 1rem;
     border-radius: 2rem;
     font-size: 0.9rem;
+    color: #fff !important;
 }
 
 .detail-item {
@@ -159,15 +153,24 @@
 .markdown-content {
     font-size: 1.1rem;
     line-height: 1.8;
+    color: var(--text-color);
 }
 
 .markdown-content h1 {
-    font-size: 2.5rem;
+    font-size: 2.2rem;
     font-weight: 800;
-    color: #1a1a1a;
     margin: 2.5rem 0 1.5rem;
     padding-bottom: 0.5rem;
-    border-bottom: 3px solid var(--primary-light);
+    border-bottom: 2px solid var(--border-color);
+    background: linear-gradient(135deg, #ffffff 0%, var(--primary-light) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+[data-theme="light"] .markdown-content h1 {
+    background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
 }
 
 .markdown-content h1:first-child {
@@ -176,22 +179,26 @@
 
 .markdown-content h2 {
     font-size: 1.75rem;
-    color: var(--primary-color);
+    color: var(--primary-light);
     margin: 2rem 0 1.5rem;
     padding-bottom: 0.5rem;
-    border-bottom: 2px solid var(--primary-light);
+    border-bottom: 2px solid var(--border-color);
+}
+
+[data-theme="light"] .markdown-content h2 {
+    color: var(--primary-dark);
 }
 
 .markdown-content h3 {
-    font-size: 1.5rem;
-    color: #1a1a1a;
+    font-size: 1.4rem;
+    color: var(--text-color);
     margin: 1.5rem 0 1rem;
-    font-weight: 600;
+    font-weight: 700;
 }
 
 .markdown-content p {
     margin-bottom: 1.5rem;
-    color: #374151;
+    color: var(--text-color);
 }
 
 .markdown-content ul {
@@ -210,14 +217,15 @@
     position: relative;
     padding: 0.75rem 0.75rem 0.75rem 2rem;
     margin-bottom: 0.75rem;
-    background: #f8f9fa;
-    border-radius: 0.5rem;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
     transition: var(--transition);
 }
 
 .markdown-content ul ul li {
-    background: #ffffff;
-    border: 1px solid #e5e7eb;
+    background: rgba(255, 255, 255, 0.01);
+    border: 1px solid var(--border-color);
     margin-bottom: 0.5rem;
 }
 
@@ -225,7 +233,7 @@
     content: '→';
     position: absolute;
     left: 0.75rem;
-    color: var(--primary-color);
+    color: var(--primary);
     font-weight: bold;
 }
 
@@ -234,43 +242,50 @@
 }
 
 .markdown-content ul li:hover {
-    transform: translateX(5px);
-    background: #f1f5f9;
+    transform: translateX(4px);
+    background: rgba(99, 102, 241, 0.08);
+    border-color: var(--card-border-hover);
 }
 
 .markdown-content ul ul li:hover {
-    background: #f8f9fa;
+    background: rgba(255, 255, 255, 0.03);
 }
 
 .markdown-content strong {
-    color: var(--primary-color);
+    color: var(--primary-light);
     font-weight: 600;
 }
 
+[data-theme="light"] .markdown-content strong {
+    color: var(--primary-dark);
+}
+
 .markdown-content a {
-    color: var(--primary-color);
+    color: var(--primary-light);
     text-decoration: none;
     transition: var(--transition);
 }
 
 .markdown-content a:hover {
-    color: var(--primary-dark);
+    color: var(--primary);
     text-decoration: underline;
 }
 
 /* Hotel Section Styling */
 .markdown-content .hotel-section {
-    background: white;
-    border-radius: 1rem;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
     padding: 2rem;
     margin-bottom: 2rem;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow);
     transition: var(--transition);
 }
 
 .markdown-content .hotel-section:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+    transform: translateY(-4px);
+    border-color: var(--card-border-hover);
+    box-shadow: var(--shadow-hover);
 }
 
 /* Search Results Styling */
@@ -282,36 +297,16 @@
 
 .search-result {
     padding: 1rem;
-    border-radius: 0.5rem;
-    background: #f8f9fa;
+    border-radius: var(--radius);
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-color);
     transition: var(--transition);
 }
 
 .search-result:hover {
-    background: #f1f5f9;
-    transform: translateX(5px);
-}
-
-@media (max-width: 768px) {
-    .hotel-hero {
-        min-height: 30vh;
-    }
-
-    .markdown-content h1 {
-        font-size: 2rem;
-    }
-
-    .markdown-content h2 {
-        font-size: 1.5rem;
-    }
-
-    .markdown-content h3 {
-        font-size: 1.25rem;
-    }
-
-    .markdown-content .hotel-section {
-        padding: 1.5rem;
-    }
+    background: rgba(99, 102, 241, 0.05);
+    border-color: var(--primary);
+    transform: translateX(4px);
 }
 </style>
 {% endblock %}

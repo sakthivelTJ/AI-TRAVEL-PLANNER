@@ -1,36 +1,39 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 import requests
 import json
 import os
 from datetime import datetime
 from markupsafe import Markup
 import markdown
-from config import GEMINI_API_KEY, TAVILY_API_KEY, DEFAULT_TEMPERATURE, DEFAULT_MAX_OUTPUT_TOKENS
+import bleach
+from config import (
+    GEMINI_API_KEY, TAVILY_API_KEY, DEFAULT_TEMPERATURE,
+    DEFAULT_MAX_OUTPUT_TOKENS, SUPABASE_URL, SUPABASE_KEY, SECRET_KEY
+)
 from supabase import create_client, Client
 import traceback
 
 app = Flask(__name__)
-app.secret_key = os.urandom(24)  # For session management
+app.secret_key = SECRET_KEY  # Stable key so sessions survive restarts
 
-# Configure Supabase
-supabase: Client = create_client(
-    os.getenv("VITE_SUPABASE_URL"),
-    os.getenv("VITE_SUPABASE_ANON_KEY")
-)
+# Configure Supabase (env already loaded via config import)
+supabase: Client | None = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
+
+GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 # Configure Gemini API
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel(
-    model_name="gemini-2.5-flash",  # Using newer model
-    generation_config={
-        "temperature": DEFAULT_TEMPERATURE,
-        "max_output_tokens": DEFAULT_MAX_OUTPUT_TOKENS
-    }
+client = (
+    genai.Client(
+        api_key=GEMINI_API_KEY,
+        http_options=types.HttpOptions(timeout=60000),
+    )
+    if GEMINI_API_KEY
+    else None
 )
 
-# Configure Markdown with extensions
-md = markdown.Markdown(extensions=['extra', 'nl2br', 'sane_lists', 'fenced_code', 'tables'])
+MARKDOWN_EXTENSIONS = ['extra', 'nl2br', 'sane_lists', 'fenced_code', 'tables']
 
 # Fallback content in case API fails
 fallback_content = {
@@ -115,14 +118,52 @@ fallback_content = {
             ]
 }
 
+ALLOWED_TAGS = list(bleach.sanitizer.ALLOWED_TAGS) + [
+    'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+    'pre', 'code', 'blockquote', 'hr', 'br',
+    'table', 'thead', 'tbody', 'tr', 'th', 'td',
+    'ul', 'ol', 'li', 'strong', 'em', 'del'
+]
+ALLOWED_ATTRS = {**bleach.sanitizer.ALLOWED_ATTRIBUTES, 'a': ['href', 'title', 'rel'], 'td': ['align'], 'th': ['align']}
+
 def format_markdown_content(content):
     """Format the content with proper markdown structure"""
-    # Convert markdown to HTML using the markdown library
-    html_content = md.convert(content)
-    return html_content
+    raw_html = markdown.markdown(content, extensions=MARKDOWN_EXTENSIONS)
+    return bleach.clean(raw_html, tags=ALLOWED_TAGS, attributes=ALLOWED_ATTRS)
 
+def itinerary_json_to_markdown(response_json, destination, days):
+    """Normalize Gemini's structured itinerary response for the plan view."""
+    itinerary = response_json.get('day_by_day_itinerary', [])
+    if not isinstance(itinerary, list):
+        return ''
+
+    lines = [f"# {destination} - {days} Day Travel Plan", '', '## Day-by-Day Itinerary', '']
+    for day_item in itinerary:
+        if not isinstance(day_item, dict):
+            continue
+        day_number = day_item.get('day', len(lines))
+        theme = day_item.get('theme_focus', 'Travel highlights')
+        lines.extend([f"### Day {day_number}: {theme}"])
+        for period in ('morning', 'afternoon', 'evening'):
+            details = day_item.get(period, {})
+            if not isinstance(details, dict):
+                continue
+            time = details.get('time', '')
+            heading = period.capitalize() + (f" ({time})" if time else '')
+            lines.extend([f"**{heading}**"])
+            for label, value in details.items():
+                if label == 'time' or not value:
+                    continue
+                lines.append(f"- {label.replace('_', ' ').capitalize()}: {value}")
+            lines.append('')
+
+    return '\n'.join(lines).strip()
 def search_travel_info(query, destination):
     """Enhanced Tavily API to search for travel information"""
+    if not TAVILY_API_KEY:
+        print("[DEBUG] Tavily API key is missing; skipping travel research")
+        return []
+
     url = "https://api.tavily.com/search"
     
     # Craft more specific search queries for better results
@@ -151,7 +192,7 @@ def search_travel_info(query, destination):
         }
         
         try:
-            response = requests.post(url, json=payload)
+            response = requests.post(url, json=payload, timeout=15)
             response.raise_for_status()
             results = response.json()
             if results and "results" in results:
@@ -169,6 +210,8 @@ def search_travel_info(query, destination):
 
 def save_travel_plan(travel_params, content, sources):
     """Save the travel plan to Supabase"""
+    if supabase is None:
+        return None
     try:
         data = {
             "destination": travel_params['destination'],
@@ -182,21 +225,27 @@ def save_travel_plan(travel_params, content, sources):
             "sources": sources
         }
         
+        # Associate user_id if user is authenticated in the session
+        if 'user' in session:
+            data['user_id'] = session['user']['id']
+             
         result = supabase.table('travel_plans').insert(data).execute()
         return result.data[0] if result.data else None
     except Exception as e:
         print(f"Error saving travel plan to Supabase: {e}")
         return None
 
+
 def get_travel_plan(plan_id):
     """Retrieve a travel plan from Supabase"""
+    if supabase is None:
+        return None
     try:
         result = supabase.table('travel_plans').select("*").eq('id', plan_id).execute()
         return result.data[0] if result.data else None
     except Exception as e:
         print(f"Error retrieving travel plan: {e}")
         return None
-
 def format_date(date_str):
     """Convert string date to formatted date string"""
     try:
@@ -209,11 +258,68 @@ def format_date(date_str):
 
 def generate_travel_plan(travel_params):
     """Generate a travel plan using Gemini API with enhanced prompt"""
+    import re
+    
+    # Sanitize and validate all user inputs
+    def sanitize_input(value, max_length=100):
+        """Sanitize user input to prevent prompt injection"""
+        if not isinstance(value, str):
+            value = str(value)
+        # Remove potentially dangerous characters and limit length
+        value = value.strip()[:max_length]
+        # Remove newlines and special prompt injection patterns
+        value = value.replace('\n', ' ').replace('\r', ' ')
+        return value
+    
+    # Validate numeric inputs
+    def validate_number(value, min_val=1, max_val=365):
+        """Validate numeric inputs are within acceptable range"""
+        try:
+            # Extract digits, e.g. "15+" -> "15"
+            sanitized = re.sub(r'\D', '', str(value))
+            num = int(sanitized) if sanitized else min_val
+            return max(min_val, min(num, max_val))
+        except (ValueError, TypeError):
+            return min_val
+    
+    # Sanitize all travel parameters
+    destination = sanitize_input(travel_params.get('destination', ''), 50)
+    days = validate_number(travel_params.get('days', '3'), 1, 30)
+    people = validate_number(travel_params.get('people', '1'), 1, 100)
+    accommodation = sanitize_input(travel_params.get('accommodation', 'mid-range'), 30)
+    activities = sanitize_input(travel_params.get('activities', 'sightseeing'), 100)
+    interests = sanitize_input(travel_params.get('interests', 'culture, food'), 100)
+    pace = sanitize_input(travel_params.get('pace', 'balanced'), 30)
+    trip_style = sanitize_input(travel_params.get('trip_style', 'first-time highlights'), 60)
+    dietary = sanitize_input(travel_params.get('dietary', 'no preference'), 60)
+    accessibility = sanitize_input(travel_params.get('accessibility', 'none'), 60)
+    
+    budget_raw = sanitize_input(travel_params.get('budget', 'medium'), 20)
+    budget_amount = sanitize_input(travel_params.get('budget_amount', ''), 20)
+    currency = sanitize_input(travel_params.get('currency', 'INR'), 10)
+    
+    # Formulate a descriptive budget label for storage
+    if budget_amount:
+        budget = f"{budget_raw.capitalize()} ({currency} {budget_amount})"
+    else:
+        budget = budget_raw.capitalize()
+        
+    travel_params['budget'] = budget
+    travel_params['days'] = days
+    travel_params['people'] = people
+    
+    if not destination:
+        html_fallback = format_markdown_content(fallback_content["content"])
+        return {
+            "content": html_fallback,
+            "sources": fallback_content["sources"],
+            "plan_id": None
+        }
     
     # Search for additional information using Tavily
     search_results = search_travel_info(
-        f"travel guide for {travel_params['destination']}", 
-        travel_params['destination']
+        f"travel guide for {destination}", 
+        destination
     )
     
     # Extract useful information from search results
@@ -221,113 +327,178 @@ def generate_travel_plan(travel_params):
     sources = []
     
     if search_results:
-        for i, result in enumerate(search_results):
-            search_info += f"\nSource {i+1}: {result['title']}\n"
-            search_info += f"URL: {result['url']}\n"
-            search_info += f"Content: {result['content'][:300]}...\n\n"
+        for i, result in enumerate(search_results[:5]):  # Limit to 5 results
+            search_info += f"\nSource {i+1}: {sanitize_input(result.get('title', ''), 100)}\n"
+            search_info += f"URL: {sanitize_input(result.get('url', ''), 200)}\n"
+            text = result.get('content') or result.get('raw_content', '')
+            search_info += f"Content: {sanitize_input(text, 300)}\n\n"
             
             sources.append({
-                "name": result['title'],
-                "url": result['url']
+                "name": result.get('title', 'Unknown'),
+                "url": result.get('url', '')
             })
+            
+    # Construct budget requirements text
+    budget_limit_prompt = ""
+    if budget_amount:
+        budget_limit_prompt = f"Make sure the total cost of all recommended items (accommodation, meals, transport, activities) fits strictly within a budget of {currency} {budget_amount}."
     
-    # Build enhanced prompt for Gemini
-    prompt = f"""
-    Create a detailed {travel_params['days']}-day travel itinerary for {travel_params['destination']} in markdown format.
+    # Build enhanced prompt for Gemini with sanitized parameters
+    prompt = f"""Create a detailed {days}-day travel itinerary for {destination} in markdown format.
 
-    # {travel_params['destination']} - {travel_params['days']} Day Travel Plan
+# {destination} - {days} Day Travel Plan
 
-    ## Trip Overview
-    - Destination: {travel_params['destination']}
-    - Duration: {travel_params['days']} days
-    - Travelers: {travel_params['people']} people
-    - Budget: {travel_params.get('budget', 'medium')}
-    - Accommodation: {travel_params['accommodation']}
-    - Activities: {travel_params['activities']}
-    - Interests: {travel_params['interests']}
+## Trip Overview
+- Destination: {destination}
+- Duration: {days} days
+- Travelers: {people} people
+- Budget: {budget}
+- Accommodation: {accommodation}
+- Activities: {activities}
+- Interests: {interests}
+- Travel pace: {pace}
+- Trip style: {trip_style}
+- Dietary needs: {dietary}
+- Accessibility needs: {accessibility}
 
-    ## Day-by-Day Itinerary
+## Day-by-Day Itinerary
 
-    IMPORTANT: Create a detailed itinerary for EACH of the {travel_params['days']} days. For each day include:
+IMPORTANT: Create a detailed itinerary for EACH of the {days} days. For each day include:
 
-    - Use Indian Rupees (INR) for all cost estimates and display the currency as ₹.
+- Use {currency} for all cost estimates and display the currency symbol correctly. {budget_limit_prompt}
 
-    ### Day 1: [Theme/Focus]
-    **Morning (8:00 AM - 12:00 PM)**
-    - Activity 1: [Specific location/attraction]
-      * Details and tips
-      * Estimated time: X hours
-      * Cost: ₹XX
-    - Activity 2: [Another location]
-      * Details and tips
+### Day 1: [Theme/Focus]
+**Morning (8:00 AM - 12:00 PM)**
+- Activity 1: [Specific location/attraction]
+  * Details and tips
+  * Estimated time: X hours
+  * Cost: {currency} XX
+- Activity 2: [Another location]
+  * Details and tips
 
-    **Afternoon (12:00 PM - 6:00 PM)**
-    - Lunch: [Restaurant recommendation]
-    - Activity 3: [Specific location]
-      * Details and tips
-    - Activity 4: [Another location]
+**Afternoon (12:00 PM - 6:00 PM)**
+- Lunch: [Restaurant recommendation]
+- Activity 3: [Specific location]
+  * Details and tips
+- Activity 4: [Another location]
 
-    **Evening (6:00 PM - 10:00 PM)**
-    - Dinner: [Restaurant recommendation]
-    - Evening activity: [Specific location or experience]
+**Evening (6:00 PM - 10:00 PM)**
+- Dinner: [Restaurant recommendation]
+- Evening activity: [Specific location or experience]
 
-    [REPEAT THIS FORMAT FOR ALL {travel_params['days']} DAYS]
+[REPEAT THIS FORMAT FOR ALL {days} DAYS]
 
-    ## Accommodation Recommendations
-    - Option 1: [Hotel/Airbnb name]
-      * Location and why it's good
-      * Price range: ₹XX-₹XX per night
-    - Option 2: [Alternative]
-    - Option 3: [Budget option]
-1
-    ## Dining Guide
-    - Must-try dishes in {travel_params['destination']}
-    - Recommended restaurants:
-      * Budget: [Name] - [Specialty]
-      * Mid-range: [Name] - [Specialty]
-      * Fine dining: [Name] - [Specialty]
+## Accommodation Recommendations
+- Option 1: [Hotel/Airbnb name]
+  * Location and why it's good
+  * Price range: {currency} XX-{currency} XX per night
+- Option 2: [Alternative]
+- Option 3: [Budget option]
 
-    ## Transportation
-    - Getting to {travel_params['destination']}
-    - Getting around the city
-    - Estimated costs
+## Dining Guide
+- Must-try dishes in {destination}
+- Recommended restaurants:
+  * Budget: [Name] - [Specialty]
+  * Mid-range: [Name] - [Specialty]
+  * Fine dining: [Name] - [Specialty]
 
-    ## Budget Breakdown
-    - Accommodation: ₹XX per night x {travel_params['days']} nights
-    - Meals: ₹XX per day x {travel_params['days']} days
-    - Activities & Attractions: ₹XX total
-    - Transportation: ₹XX total
-    - **Total Estimated Cost: ₹XXX - ₹XXX**
+## Transportation
+- Getting to {destination}
+- Getting around the city
+- Estimated costs
 
-    ## Local Tips & Essentials
-    - Best time to visit
-    - Local customs and etiquette
-    - Safety tips
-    - Useful phrases
-    - Emergency contacts
+## Budget Breakdown
+- Accommodation: {currency} XX per night x {days} nights
+- Meals: {currency} XX per day x {days} days
+- Activities & Attractions: {currency} XX total
+- Transportation: {currency} XX total
+- **Total Estimated Cost: {currency} XXX - {currency} XXX**
 
-    Additional context from research:
-    {search_info}
+## Local Tips & Essentials
+- Best time to visit
+- Local customs and etiquette
+- Safety tips
+- Useful phrases
+- Emergency contacts
 
-    CRITICAL: You MUST create a complete day-by-day itinerary for all {travel_params['days']} days with specific activities, timings, and locations for morning, afternoon, and evening.
-    """
+Additional context from research:
+{search_info}
+
+CRITICAL: You MUST create a complete day-by-day itinerary for all {days} days with specific activities, timings, and locations for morning, afternoon, and evening.
+
+YOU MUST RETURN THE RESPONSE AS A JSON OBJECT WITH THE FOLLOWING SCHEMA:
+{{
+  "itinerary_markdown": "The complete travel plan in markdown format, matching the exact headers, day structure, overview, accommodation, dining, transportation, budget, and local tips sections specified above.",
+  "days": [
+    {{
+      "day": 1,
+      "stops": [
+        {{
+          "name": "Specific attraction name, restaurant name, or hotel name",
+          "address": "Brief address or landmark location, e.g. Eiffel Tower, Paris, France",
+          "lat": 48.8584,
+          "lng": 2.2945,
+          "time": "e.g. 08:00 AM",
+          "description": "Short summary of the activity",
+          "transport_to_next": "WALKING"
+        }},
+        ...
+      ]
+    }},
+    ...
+  ]
+}}
+
+Ensure that 'lat' and 'lng' are real numeric coordinates representing the exact location of the stop. The order of 'stops' must match the timeline of the day's itinerary. Set 'transport_to_next' to either 'WALKING', 'DRIVING', or 'CYCLING' to specify how to travel to the next stop.
+"""
     
     try:
-        response = model.generate_content(prompt)
+        if client is None:
+            raise RuntimeError("GEMINI_API_KEY is missing. Set it in your environment before generating a plan.")
+
+        # Request content with JSON configuration
+        response = client.models.generate_content(
+            model=GEMINI_MODEL_NAME,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                temperature=DEFAULT_TEMPERATURE,
+                max_output_tokens=DEFAULT_MAX_OUTPUT_TOKENS,
+                response_mime_type="application/json"
+            )
+        )
         raw_text = response.text
         
-        # DEBUG: Log if itinerary section exists in response
-        has_itinerary = "Itinerary" in raw_text or "Day" in raw_text
-        print(f"[DEBUG] AI Response length: {len(raw_text)}")
-        print(f"[DEBUG] Has Itinerary section: {has_itinerary}")
-        if not has_itinerary:
-            print(f"[DEBUG] Raw response preview: {raw_text[:500]}...")
+        # Parse JSON output
+        try:
+            cleaned_text = raw_text.strip()
+            # Remove markdown code fences if present in the response
+            code_block_match = re.search(r'```(?:json)?\s*(.*?)\s*```', cleaned_text, re.DOTALL)
+            if code_block_match:
+                cleaned_text = code_block_match.group(1).strip()
+            response_json = json.loads(cleaned_text)
+            itinerary_markdown = response_json.get('itinerary_markdown', '')
+            days_data = response_json.get('days', [])
+            if not itinerary_markdown:
+                itinerary_markdown = itinerary_json_to_markdown(
+                    response_json, destination, days
+                )
+        except Exception as json_err:
+            print(f"[DEBUG] JSON parsing failed: {json_err}")
+            # Fallback if AI didn't output JSON
+            itinerary_markdown = raw_text
+            days_data = []
+
+        # Add days_data to sources list as a metadata item
+        sources.append({
+            "type": "days_data",
+            "data": days_data
+        })
         
         # Save the plan to Supabase
-        saved_plan = save_travel_plan(travel_params, raw_text, sources)
+        saved_plan = save_travel_plan(travel_params, itinerary_markdown, sources)
         
         # Convert markdown to HTML using the markdown library
-        html_content = format_markdown_content(raw_text)
+        html_content = format_markdown_content(itinerary_markdown)
         
         return {
             "content": html_content,
@@ -339,7 +510,12 @@ def generate_travel_plan(travel_params):
         print(f"[DEBUG] Error type: {type(e).__name__}")
         print(f"[DEBUG] Full traceback: {traceback.format_exc()}")
         print(f"[DEBUG] Returning fallback content (NO ITINERARY)")
-        return fallback_content
+        html_fallback = format_markdown_content(fallback_content["content"])
+        return {
+            "content": html_fallback,
+            "sources": fallback_content["sources"],
+            "plan_id": None
+        }
 
 @app.route('/')
 def index():
@@ -373,7 +549,11 @@ def generate_plan():
                                         'accommodation': plan_data['accommodation'],
                                         'activities': plan_data['activities'],
                                         'interests': plan_data['interests'],
-                                        'budget': plan_data['budget']
+                                        'budget': plan_data['budget'],
+                                        'pace': 'balanced',
+                                        'trip_style': 'first-time highlights',
+                                        'dietary': 'no preference',
+                                        'accessibility': 'none'
                                     },
                                     plan_id=plan_id,
                                     generated_date=formatted_date)
@@ -390,7 +570,13 @@ def generate_plan():
         'accommodation': request.form.get('accommodation', 'mid-range'),
         'activities': request.form.get('activities', 'sightseeing'),
         'interests': request.form.get('interests', 'culture, food'),
-        'budget': request.form.get('budget', 'medium')
+        'budget': request.form.get('budget', 'medium'),
+        'budget_amount': request.form.get('budget_amount', ''),
+        'currency': request.form.get('currency', 'INR'),
+        'pace': request.form.get('pace', 'balanced'),
+        'trip_style': request.form.get('trip_style', 'first-time highlights'),
+        'dietary': request.form.get('dietary', 'no preference'),
+        'accessibility': request.form.get('accessibility', 'none')
     }
     
     # Validate inputs
@@ -405,7 +591,7 @@ def generate_plan():
     result = generate_travel_plan(travel_params)
     
     return render_template('plan.html', 
-                          plan=Markup(result["content"]), 
+                          plan=result["content"], 
                           sources=result.get("sources", []),
                           params=travel_params,
                           plan_id=result.get("plan_id"),
@@ -425,7 +611,13 @@ def regenerate_plan():
         'accommodation': session.get('accommodation', 'mid-range'),
         'activities': session.get('activities', 'sightseeing'),
         'interests': session.get('interests', 'culture, food'),
-        'budget': session.get('budget', 'medium')
+        'budget': session.get('budget', 'medium'),
+        'budget_amount': session.get('budget_amount', ''),
+        'currency': session.get('currency', 'INR'),
+        'pace': session.get('pace', 'balanced'),
+        'trip_style': session.get('trip_style', 'first-time highlights'),
+        'dietary': session.get('dietary', 'no preference'),
+        'accessibility': session.get('accessibility', 'none')
     }
     
     # Generate a new plan with the same parameters
@@ -532,6 +724,10 @@ def create_guide():
                 'default_bg_color': request.form.get('default_bg_color', '#4F46E5')
             }
             
+            # Associate user_id if user is authenticated in the session
+            if 'user' in session:
+                data['user_id'] = session['user']['id']
+                
             result = supabase.table('travel_guides').insert(data).execute()
             
             if result.data:
@@ -588,7 +784,7 @@ def hotel_search():
                 "max_results": 5
             }
             
-            response = requests.post(url, json=payload)
+            response = requests.post(url, json=payload, timeout=15)
             response.raise_for_status()
             hotel_results = response.json()
 
@@ -663,7 +859,17 @@ def hotel_search():
             {json.dumps(hotel_results.get('results', []), indent=2)}
             """
 
-            response = model.generate_content(prompt)
+            if client is None:
+                raise RuntimeError("GEMINI_API_KEY is missing. Set it in your environment before searching hotels.")
+
+            response = client.models.generate_content(
+                model=GEMINI_MODEL_NAME,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    temperature=DEFAULT_TEMPERATURE,
+                    max_output_tokens=DEFAULT_MAX_OUTPUT_TOKENS,
+                )
+            )
             if not response or not response.text:
                 raise Exception("No response from Gemini API")
 
@@ -677,6 +883,10 @@ def hotel_search():
                 'search_results': hotel_results.get('results', [])
             }
             
+            # Associate user_id if user is authenticated in the session
+            if 'user' in session:
+                search_data['user_id'] = session['user']['id']
+                
             result = supabase.table('hotel_searches').insert(search_data).execute()
             if not result.data:
                 raise Exception("Failed to save search to database")
@@ -743,8 +953,8 @@ def view_hotel_search(search_id):
         if result.data:
             # Convert markdown to HTML if recommendations exist
             if result.data.get('recommendations'):
-                recommendations = md.convert(result.data['recommendations'])
-                result.data['recommendations'] = Markup(recommendations)
+                recommendations = bleach.clean(markdown.markdown(result.data['recommendations'], extensions=MARKDOWN_EXTENSIONS), tags=ALLOWED_TAGS, attributes=ALLOWED_ATTRS)
+                result.data['recommendations'] = recommendations
             return render_template('view_hotel_search.html', search=result.data)
         return redirect(url_for('hotel_searches'))
     except Exception as e:
@@ -767,5 +977,107 @@ def terms():
 def faq():
     return render_template('faq.html')
 
+# ==========================================
+# ADVANCED AUTHENTICATION & DASHBOARD ROUTES
+# ==========================================
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if 'user' in session:
+        return redirect(url_for('dashboard'))
+        
+    if request.method == 'POST':
+        email = request.form.get('email')
+        password = request.form.get('password')
+        try:
+            # Sign up the user in Supabase Auth
+            res = supabase.auth.sign_up({
+                "email": email,
+                "password": password
+            })
+            # Attempt to sign in directly
+            login_res = supabase.auth.sign_in_with_password({
+                "email": email,
+                "password": password
+            })
+            if login_res.user:
+                session['user'] = {
+                    'id': login_res.user.id,
+                    'email': login_res.user.email
+                }
+                flash("Account created and logged in successfully!", "success")
+                return redirect(url_for('dashboard'))
+            else:
+                flash("Account created! Please log in.", "success")
+                return redirect(url_for('login'))
+        except Exception as e:
+            flash(f"Registration failed: {str(e)}", "danger")
+            
+    return render_template('register.html')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if 'user' in session:
+        return redirect(url_for('dashboard'))
+        
+    if request.method == 'POST':
+        email = request.form.get('email')
+        password = request.form.get('password')
+        try:
+            res = supabase.auth.sign_in_with_password({
+                "email": email,
+                "password": password
+            })
+            if res.user:
+                session['user'] = {
+                    'id': res.user.id,
+                    'email': res.user.email
+                }
+                flash("Logged in successfully!", "success")
+                return redirect(url_for('dashboard'))
+            else:
+                flash("Invalid login credentials.", "danger")
+        except Exception as e:
+            flash(f"Login failed: {str(e)}", "danger")
+            
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    try:
+        supabase.auth.sign_out()
+    except Exception:
+        pass
+    session.clear()
+    flash("Logged out successfully!", "success")
+    return redirect(url_for('index'))
+
+@app.route('/dashboard')
+def dashboard():
+    if 'user' not in session:
+        flash("Please log in to access your dashboard.", "warning")
+        return redirect(url_for('login'))
+        
+    user_id = session['user']['id']
+    try:
+        # Fetch user's travel plans
+        plans_res = supabase.table('travel_plans').select("*").eq('user_id', user_id).order('created_at', desc=True).execute()
+        plans = plans_res.data if plans_res.data else []
+        
+        # Fetch user's hotel searches
+        hotels_res = supabase.table('hotel_searches').select("*").eq('user_id', user_id).order('created_at', desc=True).execute()
+        hotels = hotels_res.data if hotels_res.data else []
+        
+        # Fetch user's travel guides
+        guides_res = supabase.table('travel_guides').select("*").eq('user_id', user_id).order('created_at', desc=True).execute()
+        guides = guides_res.data if guides_res.data else []
+        
+        return render_template('dashboard.html', plans=plans, hotels=hotels, guides=guides)
+    except Exception as e:
+        print(f"Error loading dashboard: {str(e)}")
+        flash("An error occurred loading your dashboard.", "danger")
+        return render_template('dashboard.html', plans=[], hotels=[], guides=[])
+
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)

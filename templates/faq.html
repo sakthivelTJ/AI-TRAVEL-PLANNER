@@ -113,49 +113,35 @@
 {% block extra_css %}
 <style>
 .faq-hero {
-    background: linear-gradient(135deg, #4F46E5, #7C3AED);
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark)) !important;
     min-height: 40vh;
 }
 
 .hero-bg {
     background: url('https://source.unsplash.com/random/1920x1080/?travel-map') center/cover;
-    opacity: 0.2;
-}
-
-.card {
-    border: none;
-    border-radius: 1rem;
+    opacity: 0.15;
 }
 
 .accordion-item {
     border: none;
     background: transparent;
-}
-
-.accordion-item:not(:last-child) {
-    border-bottom: 1px solid rgba(0,0,0,0.1);
+    border-bottom: 1px solid var(--border-color) !important;
 }
 
 .accordion-button {
     padding: 1.5rem;
-    font-weight: 500;
-    background: white;
+    font-weight: 600;
+    background: transparent !important;
+    color: var(--text-color) !important;
 }
 
 .accordion-button:not(.collapsed) {
-    color: #4F46E5;
-    background: white;
+    color: var(--primary-light) !important;
     box-shadow: none;
 }
 
 .accordion-button:focus {
     box-shadow: none;
-    border-color: rgba(0,0,0,0.1);
-}
-
-.accordion-button::after {
-    background-size: 1.25rem;
-    transition: all 0.2s ease;
 }
 
 .faq-categories .btn {
@@ -164,12 +150,9 @@
 }
 
 .faq-categories .btn.active {
-    background: #4F46E5;
-    color: white;
-}
-
-#faqSearch:focus {
-    box-shadow: none;
+    background: var(--primary) !important;
+    color: white !important;
+    box-shadow: 0 4px 12px var(--primary-glow);
 }
 </style>
 {% endblock %}

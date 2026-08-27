@@ -13,7 +13,7 @@ fi
 
 # Activate virtual environment
 echo "🔧 Activating virtual environment..."
-source venv/bin/activate
+. venv/bin/activate
 
 # Install dependencies
 echo "📥 Installing dependencies..."

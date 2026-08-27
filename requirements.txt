@@ -1,9 +1,11 @@
 Flask
+gunicorn
 python-dotenv
 requests
-google-generativeai
+google-genai
 tavily-python
 Markdown
+markupsafe
+bleach
 supabase
-python-dotenv 
 psycopg2

@@ -2,18 +2,13 @@
 """
 Test script to verify itinerary generation
 """
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from config import GEMINI_API_KEY, DEFAULT_TEMPERATURE, DEFAULT_MAX_OUTPUT_TOKENS
 
 # Configure Gemini API
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel(
-    model_name="gemini-2.0-flash",
-    generation_config={
-        "temperature": DEFAULT_TEMPERATURE,
-        "max_output_tokens": DEFAULT_MAX_OUTPUT_TOKENS
-    }
-)
+client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
+model_name = "gemini-2.5-flash"
 
 # Test parameters
 travel_params = {
@@ -61,37 +56,53 @@ print("Testing itinerary generation...")
 print("=" * 60)
 
 try:
-    response = model.generate_content(prompt)
-    result = response.text
-    
-    print(f"Response length: {len(result)} characters")
-    print("=" * 60)
-    
-    # Check if itinerary sections exist
-    has_day_1 = "Day 1" in result
-    has_day_2 = "Day 2" in result
-    has_day_3 = "Day 3" in result
-    has_morning = "Morning" in result
-    has_afternoon = "Afternoon" in result
-    has_evening = "Evening" in result
-    
-    print(f"✓ Has Day 1: {has_day_1}")
-    print(f"✓ Has Day 2: {has_day_2}")
-    print(f"✓ Has Day 3: {has_day_3}")
-    print(f"✓ Has Morning section: {has_morning}")
-    print(f"✓ Has Afternoon section: {has_afternoon}")
-    print(f"✓ Has Evening section: {has_evening}")
-    print("=" * 60)
-    
-    if all([has_day_1, has_day_2, has_day_3, has_morning, has_afternoon, has_evening]):
-        print("✅ SUCCESS: Itinerary generated correctly!")
+    if client is None:
+        print("GEMINI_API_KEY is not configured. Skipping itinerary test.")
     else:
-        print("❌ ISSUE: Some itinerary sections are missing")
-    
-    print("\nFirst 500 characters of response:")
-    print(result[:500])
+        response = client.models.generate_content(
+            model=model_name,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                temperature=DEFAULT_TEMPERATURE,
+                max_output_tokens=DEFAULT_MAX_OUTPUT_TOKENS,
+                response_mime_type="application/json"
+            )
+        )
+        raw = response.text
+        # Sanitize: remove non-printable control characters from AI output
+        result = ''.join(ch for ch in raw if ch.isprintable() or ch in ('\n', '\t'))
+        
+        print(f"Response length: {len(result)} characters")
+        print("=" * 60)
+        
+        # Check if itinerary sections exist
+        has_day_1 = "Day 1" in result
+        has_day_2 = "Day 2" in result
+        has_day_3 = "Day 3" in result
+        has_morning = "Morning" in result
+        has_afternoon = "Afternoon" in result
+        has_evening = "Evening" in result
+        
+        print(f"[OK] Has Day 1: {has_day_1}")
+        print(f"[OK] Has Day 2: {has_day_2}")
+        print(f"[OK] Has Day 3: {has_day_3}")
+        print(f"[OK] Has Morning section: {has_morning}")
+        print(f"[OK] Has Afternoon section: {has_afternoon}")
+        print(f"[OK] Has Evening section: {has_evening}")
+        print("=" * 60)
+        
+        if all([has_day_1, has_day_2, has_day_3, has_morning, has_afternoon, has_evening]):
+            print("[SUCCESS] SUCCESS: Itinerary generated correctly!")
+        else:
+            print("[FAIL] ISSUE: Some itinerary sections are missing")
+        
+        print("\nFirst 500 characters of response:")
+        print(result[:500])
     
 except Exception as e:
-    print(f"❌ ERROR: {e}")
+    print(f"[ERROR] ERROR: {e}")
     import traceback
     traceback.print_exc()
+    
+finally:
+    response = None  # release reference to network resource
