@@ -23,7 +23,7 @@ An intelligent travel planning application that uses AI to generate personalized
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/sakthivel-T-J/AI-Travel-Planner.git
+git clone https://github.com/sakthivelTJ/AI-TRAVEL-PLANNER.git
 cd AI-Travel-Planner
 ```
 
@@ -132,7 +132,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## 🙋 Support
 
 For issues, questions, or suggestions:
-- Open an issue on [GitHub Issues](https://github.com/sakthivel-T-J/AI-Travel-Planner/issues)
+- Open an issue on [GitHub Issues](https://github.com/sakthivelTJ/AI-TRAVEL-PLANNER/issues)
 - Check existing documentation in the repository
 
 ## 🎯 Roadmap
