@@ -18,16 +18,16 @@
                     </ol>
                 </nav>
                 <h1 class="display-4 fw-bold text-white mb-3">
-                    Hotels in {{ search.location }}
+                    Hotels in {{ search.location or 'your destination' }}
                 </h1>
                 <div class="d-flex flex-wrap gap-3 text-white">
                     <div class="search-detail">
                         <i class="bi bi-people me-2"></i>
-                        {{ search.guests }} guests
+                        {{ search.guests or 'N/A' }} guests
                     </div>
                     <div class="search-detail">
                         <i class="bi bi-wallet2 me-2"></i>
-                        {{ search.budget }} budget
+                        {{ search.budget or 'N/A' }} budget
                     </div>
                     {% if search.preferences %}
                     <div class="search-detail">

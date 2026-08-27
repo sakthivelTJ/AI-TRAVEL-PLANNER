@@ -4,6 +4,7 @@ from google.genai import types
 import requests
 import json
 import os
+import time
 from datetime import datetime
 from markupsafe import Markup
 import markdown
@@ -255,6 +256,30 @@ def format_date(date_str):
         return None
     except Exception:
         return None
+
+
+def convert_usd_to_inr(text, rate=82.0):
+    """Convert USD amounts in text to INR using a fixed rate and change currency symbol."""
+    import re
+
+    def convert_match(match):
+        usd_str = match.group(1)
+        try:
+            usd_value = float(usd_str)
+            inr_value = usd_value * rate
+            if inr_value.is_integer():
+                inr_display = f"₹{int(inr_value):,}"
+            else:
+                inr_display = f"₹{inr_value:,.2f}"
+            return inr_display
+        except Exception:
+            return match.group(0)
+
+    text = re.sub(r"\$([0-9]+(?:\.[0-9]+)?)", convert_match, text)
+    text = re.sub(r"\$(XX+)", r"₹\1", text)
+    text = text.replace("USD", "INR").replace("usd", "inr")
+    return text
+
 
 def generate_travel_plan(travel_params):
     """Generate a travel plan using Gemini API with enhanced prompt"""
@@ -633,6 +658,15 @@ def regenerate_plan():
 @app.route('/plans')
 def list_plans():
     """Route to display all saved travel plans"""
+    if not supabase:
+        return render_template('plans.html',
+                             plans=[],
+                             current_page=1,
+                             total_pages=1,
+                             prev_page=None,
+                             next_page=None,
+                             error="Database is not configured.")
+
     try:
         page = request.args.get('page', 1, type=int)
         per_page = 9  # Number of plans per page
@@ -672,6 +706,16 @@ def list_plans():
 
 @app.route('/travel-guides')
 def travel_guides():
+    if not supabase:
+        return render_template('travel_guides.html',
+                             guides=[],
+                             categories=set(),
+                             current_page=1,
+                             total_pages=1,
+                             prev_page=None,
+                             next_page=None,
+                             error="Database is not configured.")
+
     try:
         page = request.args.get('page', 1, type=int)
         per_page = 9  # Number of guides per page
@@ -712,6 +756,10 @@ def travel_guides():
 @app.route('/travel-guides/create', methods=['GET', 'POST'])
 def create_guide():
     if request.method == 'POST':
+        if not supabase:
+            flash('Database is not configured. Cannot create guide.', 'error')
+            return render_template('create_guide.html', error="Database is not configured.")
+
         try:
             data = {
                 'title': request.form['title'],
@@ -744,6 +792,10 @@ def create_guide():
 
 @app.route('/travel-guides/<guide_id>')
 def view_guide(guide_id):
+    if not supabase:
+        print("Supabase not configured; cannot view travel guide.")
+        return redirect(url_for('travel_guides'))
+
     try:
         result = supabase.table('travel_guides').select("*").eq('id', guide_id).single().execute()
         if result.data:
@@ -756,6 +808,14 @@ def view_guide(guide_id):
 @app.route('/hotel-search', methods=['GET', 'POST'])
 def hotel_search():
     if request.method == 'POST':
+        if not supabase:
+            flash('Database is not configured. Hotel search is unavailable.', 'error')
+            return redirect(url_for('hotel_search'))
+
+        if not TAVILY_API_KEY:
+            flash('Tavily API key is not configured. Hotel search is unavailable.', 'error')
+            return redirect(url_for('hotel_search'))
+
         try:
             location = request.form.get('location')
             guests = request.form.get('guests', '2')
@@ -879,7 +939,7 @@ def hotel_search():
                 'guests': int(guests),
                 'preferences': preferences,
                 'budget': budget,
-                'recommendations': response.text,
+                'recommendations': hotel_text,
                 'search_results': hotel_results.get('results', [])
             }
             
@@ -909,6 +969,15 @@ def hotel_search():
 
 @app.route('/hotel-searches')
 def hotel_searches():
+    if not supabase:
+        return render_template('hotel_searches.html',
+                             searches=[],
+                             current_page=1,
+                             total_pages=1,
+                             prev_page=None,
+                             next_page=None,
+                             error="Database is not configured.")
+
     try:
         page = request.args.get('page', 1, type=int)
         per_page = 6  # Number of searches per page
@@ -948,9 +1017,21 @@ def hotel_searches():
 
 @app.route('/hotel-search/<search_id>')
 def view_hotel_search(search_id):
+    if not supabase:
+        print("Supabase not configured; cannot view hotel search.")
+        return redirect(url_for('hotel_searches'))
+
     try:
         result = supabase.table('hotel_searches').select("*").eq('id', search_id).single().execute()
         if result.data:
+            search_data = result.data
+
+            # Set fallback values so header section does not go blank
+            search_data['location'] = search_data.get('location') or 'your destination'
+            search_data['guests'] = search_data.get('guests') or 'N/A'
+            search_data['budget'] = search_data.get('budget') or 'N/A'
+            search_data['preferences'] = search_data.get('preferences', '')
+
             # Convert markdown to HTML if recommendations exist
             if result.data.get('recommendations'):
                 recommendations = bleach.clean(markdown.markdown(result.data['recommendations'], extensions=MARKDOWN_EXTENSIONS), tags=ALLOWED_TAGS, attributes=ALLOWED_ATTRS)
