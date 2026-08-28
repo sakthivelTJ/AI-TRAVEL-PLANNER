@@ -509,8 +509,8 @@ Ensure that 'lat' and 'lng' are real numeric coordinates representing the exact 
                 )
         except Exception as json_err:
             print(f"[DEBUG] JSON parsing failed: {json_err}")
-            # Fallback if AI didn't output JSON
-            itinerary_markdown = raw_text
+            # Use readable fallback content when the model response is incomplete.
+            itinerary_markdown = fallback_content["content"]
             days_data = []
 
         # Add days_data to sources list as a metadata item

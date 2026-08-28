@@ -96,8 +96,8 @@ block content %}
       <div class="sticky-lg-top" style="top: 2rem; z-index: 1000">
         <!-- Trip Overview Card -->
         <div class="card shadow-sm mb-4 overview-card">
-          <div class="card-header bg-gradient p-4">
-            <h5 class="card-title mb-0 text-black d-flex align-items-center">
+          <div class="card-header bg-gradient p-4 text-white">
+            <h5 class="card-title mb-0 text-white d-flex align-items-center">
               <i class="bi bi-journal-text me-2"></i>
               Trip Overview
             </h5>
@@ -192,8 +192,8 @@ block content %}
         <!-- Sources Card with Enhanced Styling -->
         {% if sources %}
         <div class="card shadow-sm sources-card">
-          <div class="card-header bg-gradient p-4">
-            <h5 class="card-title mb-0 text-black d-flex align-items-center">
+          <div class="card-header bg-gradient p-4 text-white">
+            <h5 class="card-title mb-0 text-white d-flex align-items-center">
               <i class="bi bi-link-45deg me-2"></i>
               Sources & References
             </h5>
@@ -264,18 +264,52 @@ block content %}
                   class="journey-map itinerary-map"
                   id="itinerary-map"
                   aria-label="Map of the selected day's places"
-                  style="height: 480px; min-height: 480px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--card-bg); position: relative; z-index: 1;"
+                  style="
+                    height: 480px;
+                    min-height: 480px;
+                    border-radius: 8px;
+                    border: 1px solid var(--border-color);
+                    background: var(--card-bg);
+                    position: relative;
+                    z-index: 1;
+                  "
                 ></div>
               </div>
               <div class="col-md-3">
-                <div class="border rounded-3 p-3 h-100 d-flex flex-column" style="max-height: 480px; background: rgba(255, 255, 255, 0.01); border-color: var(--border-color) !important;">
-                  <div class="fw-bold mb-2 pb-1 border-bottom text-muted" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em;">Stop List</div>
-                  <div id="journey-legend" class="journey-legend d-flex flex-column gap-2 flex-grow-1" style="overflow-y: auto;" aria-label="Places on the selected day"></div>
+                <div
+                  class="border rounded-3 p-3 h-100 d-flex flex-column"
+                  style="
+                    max-height: 480px;
+                    background: rgba(255, 255, 255, 0.01);
+                    border-color: var(--border-color) !important;
+                  "
+                >
+                  <div
+                    class="fw-bold mb-2 pb-1 border-bottom text-muted"
+                    style="
+                      font-size: 0.8rem;
+                      text-transform: uppercase;
+                      letter-spacing: 0.05em;
+                    "
+                  >
+                    Stop List
+                  </div>
+                  <div
+                    id="journey-legend"
+                    class="journey-legend d-flex flex-column gap-2 flex-grow-1"
+                    style="overflow-y: auto"
+                    aria-label="Places on the selected day"
+                  ></div>
                 </div>
               </div>
             </div>
-            <div id="itinerary-map-summary" class="route-summary border-top mt-3 pt-3">
-              <div class="text-center py-2 text-muted small">Select a day to view stops and route information.</div>
+            <div
+              id="itinerary-map-summary"
+              class="route-summary border-top mt-3 pt-3"
+            >
+              <div class="text-center py-2 text-muted small">
+                Select a day to view stops and route information.
+              </div>
             </div>
           </section>
 
@@ -380,16 +414,28 @@ block content %}
 <style>
   /* Enhanced Hero Section */
   .parallax-hero {
-    background: linear-gradient(135deg, rgba(8, 11, 17, 0.9) 0%, rgba(8, 11, 17, 0.5) 100%),
-                url("https://source.unsplash.com/1600x900/?{{ params.destination }}") center/cover fixed;
+    background:
+      linear-gradient(
+        135deg,
+        rgba(8, 11, 17, 0.9) 0%,
+        rgba(8, 11, 17, 0.5) 100%
+      ),
+      url("https://source.unsplash.com/1600x900/?{{ params.destination }}")
+        center/cover fixed;
     padding: 8rem 0;
     position: relative;
     overflow: hidden;
   }
 
   [data-theme="light"] .parallax-hero {
-    background: linear-gradient(135deg, rgba(248, 250, 252, 0.9) 0%, rgba(248, 250, 252, 0.6) 100%),
-                url("https://source.unsplash.com/1600x900/?{{ params.destination }}") center/cover fixed;
+    background:
+      linear-gradient(
+        135deg,
+        rgba(248, 250, 252, 0.9) 0%,
+        rgba(248, 250, 252, 0.6) 100%
+      ),
+      url("https://source.unsplash.com/1600x900/?{{ params.destination }}")
+        center/cover fixed;
   }
 
   .hero-content {
@@ -437,6 +483,9 @@ block content %}
     align-items: center;
     justify-content: center;
     transition: var(--transition);
+  }
+  .map-panel-heading {
+    color: white;
   }
 
   .overview-item:hover .icon-circle {
@@ -512,7 +561,11 @@ block content %}
   }
 
   [data-theme="light"] .markdown-content h1 {
-    background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
+    background: linear-gradient(
+      135deg,
+      var(--primary-dark) 0%,
+      var(--primary) 100%
+    );
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
   }
@@ -659,25 +712,27 @@ block content %}
     border: 2px solid white !important;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
   }
-  
+
   .marker-pin-inner {
     transform: rotate(45deg);
     font-weight: 800;
     font-size: 0.85rem;
     margin-top: -2px;
   }
-  
+
   .custom-map-popup {
     padding: 0.2rem;
     font-family: inherit;
   }
 
   /* Ensure map text matches theme colors */
-  .custom-map-popup h6, .custom-map-popup strong {
+  .custom-map-popup h6,
+  .custom-map-popup strong {
     color: var(--primary-light) !important;
   }
 
-  .custom-map-popup p, .custom-map-popup span {
+  .custom-map-popup p,
+  .custom-map-popup span {
     color: var(--text-color) !important;
   }
 
@@ -710,14 +765,40 @@ block content %}
   }
 
   .route-summary-totals {
-    background-color: rgba(255, 255, 255, 0.01) !important;
+    background-color: var(--card-bg) !important;
     border-color: var(--border-color) !important;
     border-radius: var(--radius);
     padding: 1rem !important;
   }
 
   .route-summary-totals strong {
+    color: var(--primary-light) !important;
+  }
+
+  .route-summary-table {
+    --bs-table-color: var(--text-color);
+    --bs-table-bg: transparent;
+    --bs-table-hover-color: var(--text-color);
+    --bs-table-hover-bg: rgba(99, 102, 241, 0.08);
+    margin-bottom: 1rem;
+  }
+
+  .route-summary-table th {
+    color: var(--text-muted) !important;
+    border-bottom-color: var(--border-color) !important;
+  }
+
+  .route-summary-table td {
     color: var(--text-color) !important;
+    border-bottom-color: var(--border-color) !important;
+  }
+
+  .route-summary-table .route-stop-name {
+    color: var(--text-color) !important;
+  }
+
+  .route-summary-total-label {
+    color: var(--text-muted) !important;
   }
 </style>
 {% endblock %} {% block extra_js %}
@@ -887,7 +968,7 @@ block content %}
         title: `Stop ${index + 1}: ${stop.name}`,
         icon,
       }).addTo(leafletMap);
-      
+
       activeMarkers.push(marker);
 
       const popupContent = `
@@ -919,9 +1000,8 @@ block content %}
     };
 
     const addTiles = (leafletMap) => {
-      // Force dark mode tiles
-      const tileUrl = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
-      const attribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
+      const tileUrl = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+      const attribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 
       L.tileLayer(tileUrl, {
         attribution: attribution,
@@ -1013,7 +1093,7 @@ block content %}
 
       // Clear existing layers and legend items
       clearMap();
-      
+
       const legend = document.getElementById("journey-legend");
       const summaryContainer = document.getElementById("itinerary-map-summary");
       if (legend) legend.innerHTML = "";
@@ -1068,7 +1148,7 @@ block content %}
               </a>
             </div>
             <div class="table-responsive">
-              <table class="table table-hover table-borderless align-middle mb-3">
+              <table class="table table-hover table-borderless align-middle route-summary-table">
                 <thead>
                   <tr class="text-muted border-bottom" style="font-size: 0.8rem;">
                     <th>Stop</th>
@@ -1092,7 +1172,7 @@ block content %}
                 <td style="width: 50px;">
                   <span class="badge bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 20px; height: 20px; font-size: 0.75rem;">${index + 1}</span>
                 </td>
-                <td class="fw-bold text-light">${escapeHtml(stop.name)}</td>
+                <td class="fw-bold route-stop-name">${escapeHtml(stop.name)}</td>
                 <td>${legText}</td>
               </tr>
             `;
@@ -1102,18 +1182,18 @@ block content %}
                 </tbody>
               </table>
             </div>
-            <div class="route-summary-totals d-flex justify-content-around py-3 bg-light rounded-3 text-center border-top">
+            <div class="route-summary-totals d-flex justify-content-around py-3 rounded-3 text-center border-top">
               <div>
-                <span class="d-block text-muted small text-uppercase" style="font-size: 0.7rem;">Total Distance</span>
-                <strong class="text-light" style="font-size: 1.1rem;">${formatDistance(route.distance)}</strong>
+                <span class="d-block route-summary-total-label small text-uppercase" style="font-size: 0.7rem;">Total Distance</span>
+                <strong style="font-size: 1.1rem;">${formatDistance(route.distance)}</strong>
               </div>
               <div class="border-start border-end px-4">
-                <span class="d-block text-muted small text-uppercase" style="font-size: 0.7rem;">Est. Travel Time</span>
-                <strong class="text-light" style="font-size: 1.1rem;">${formatDuration(route.duration)}</strong>
+                <span class="d-block route-summary-total-label small text-uppercase" style="font-size: 0.7rem;">Est. Travel Time</span>
+                <strong style="font-size: 1.1rem;">${formatDuration(route.duration)}</strong>
               </div>
               <div>
-                <span class="d-block text-muted small text-uppercase" style="font-size: 0.7rem;">Stops Visited</span>
-                <strong class="text-light" style="font-size: 1.1rem;">${dayItem.stops.length} stops</strong>
+                <span class="d-block route-summary-total-label small text-uppercase" style="font-size: 0.7rem;">Stops Visited</span>
+                <strong style="font-size: 1.1rem;">${dayItem.stops.length} stops</strong>
               </div>
             </div>
           `;
@@ -1122,7 +1202,7 @@ block content %}
           // fallback polyline routing representation
           const polylineLayer = L.polyline(mapCoords, { color: '#df765c', weight: 4, dashArray: '8, 8' }).addTo(leafletMap);
           activeRoutes.push(polylineLayer);
-          
+
           summaryContainer.innerHTML = `
             <div class="d-flex justify-content-between align-items-center mb-3">
               <div class="alert alert-secondary py-2 small mb-0 flex-grow-1 me-3">
@@ -1154,7 +1234,7 @@ block content %}
           <strong>${dayItem.day}</strong>
         </button>
       `).join("");
-      
+
       tabsContainer.querySelectorAll(".itinerary-day-tab").forEach(tab => {
         tab.addEventListener("click", () => {
           const index = parseInt(tab.dataset.dayIndex, 10);

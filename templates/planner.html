@@ -86,7 +86,7 @@
                   name="days"
                 >
                   {% for i in range(1, 15) %}
-                  <option value="{{ i }}" {% if i == 3 %}selected{% endif %}>
+                  <option value="{{ i }}" {% if i="" ="3" %}selected{% endif %}>
                     {{ i }} day{% if i != 1 %}s{% endif %}
                   </option>
                   {% endfor %}
@@ -428,9 +428,14 @@
     border-radius: 99px;
     overflow: hidden;
   }
-  
+
   .loading-progress .progress-bar {
-    background: linear-gradient(90deg, var(--primary), var(--info), var(--success));
+    background: linear-gradient(
+      90deg,
+      var(--primary),
+      var(--info),
+      var(--success)
+    );
     border-radius: 99px;
   }
 
@@ -473,7 +478,7 @@
     color: var(--text-color);
     transform: translateX(4px);
   }
-  
+
   .loading-stage.active i {
     color: #ffffff;
     background: var(--primary) !important;
@@ -576,6 +581,10 @@
     background: var(--primary);
     color: white;
   }
+
+  h2 {
+    color: white;
+  }
 </style>
 {% endblock %} {% block extra_js %}
 <script>
@@ -587,22 +596,6 @@
   function initializeForm() {
     const form = document.getElementById("plannerForm");
     const destinationInput = document.getElementById("destination");
-
-    // Enhanced form validation
-    form.addEventListener("submit", function (e) {
-      if (!form.checkValidity()) {
-        e.preventDefault();
-        e.stopPropagation();
-
-        // Show validation feedback
-        Array.from(form.elements).forEach((input) => {
-          if (!input.validity.valid) {
-            input.classList.add("is-invalid");
-          }
-        });
-      }
-      form.classList.add("was-validated");
-    });
 
     // Real-time validation feedback
     form.querySelectorAll("input, select").forEach((input) => {
@@ -744,19 +737,23 @@
     let tipIndex = 0;
 
     form.addEventListener("submit", function (e) {
-      e.preventDefault();
-
-      if (form.checkValidity()) {
-        loadingModal.show();
-        startLoadingAnimation();
-
-        // Submit the form after a short delay
-        setTimeout(() => {
-          form.submit();
-        }, 500);
+      if (!form.checkValidity()) {
+        e.preventDefault();
+        e.stopPropagation();
+        Array.from(form.elements).forEach((input) => {
+          if (!input.validity.valid) input.classList.add("is-invalid");
+        });
+        form.classList.add("was-validated");
+        return;
       }
 
+      e.preventDefault();
       form.classList.add("was-validated");
+      loadingModal.show();
+      startLoadingAnimation();
+
+      // Submit natively so this handler does not run a second time.
+      setTimeout(() => form.submit(), 500);
     });
 
     function startLoadingAnimation() {
