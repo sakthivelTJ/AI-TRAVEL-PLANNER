@@ -20,19 +20,27 @@ app = Flask(__name__)
 app.secret_key = SECRET_KEY  # Stable key so sessions survive restarts
 
 # Configure Supabase (env already loaded via config import)
-supabase: Client | None = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
+supabase: Client | None = None
+if SUPABASE_URL and SUPABASE_KEY:
+    try:
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    except Exception as db_err:
+        print(f"[DEBUG] Supabase initialization failed: {db_err}")
+        supabase = None
 
 GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 # Configure Gemini API
-client = (
-    genai.Client(
-        api_key=GEMINI_API_KEY,
-        http_options=types.HttpOptions(timeout=60000),
-    )
-    if GEMINI_API_KEY
-    else None
-)
+client = None
+if GEMINI_API_KEY:
+    try:
+        client = genai.Client(
+            api_key=GEMINI_API_KEY,
+            http_options=types.HttpOptions(timeout=60000),
+        )
+    except Exception as gemini_err:
+        print(f"[DEBUG] Gemini client initialization failed: {gemini_err}")
+        client = None
 
 MARKDOWN_EXTENSIONS = ['extra', 'nl2br', 'sane_lists', 'fenced_code', 'tables']
 
