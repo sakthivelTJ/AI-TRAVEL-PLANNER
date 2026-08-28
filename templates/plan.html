@@ -699,6 +699,10 @@ block content %}
   }
 
   /* Leaflet Custom Marker & Popup Styles */
+  .leaflet-layer {
+    filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+  }
+
   .place-map-icon-custom {
     background: transparent !important;
     border: none !important;
@@ -1090,9 +1094,9 @@ block content %}
     };
 
     const addTiles = (leafletMap) => {
-      // Force dark mode tiles
-      const tileUrl = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
-      const attribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
+      // Use standard free OpenStreetMap tiles (styled as dark mode using CSS filters)
+      const tileUrl = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+      const attribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 
       L.tileLayer(tileUrl, {
         attribution: attribution,
