@@ -8,7 +8,7 @@ from config import GEMINI_API_KEY, DEFAULT_TEMPERATURE, DEFAULT_MAX_OUTPUT_TOKEN
 
 # Configure Gemini API
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
-model_name = "gemini-2.5-flash"
+model_name = "gemini-3.6-flash"
 
 # Test parameters
 travel_params = {

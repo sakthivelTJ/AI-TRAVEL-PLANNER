@@ -22,7 +22,7 @@ print('-' * 50)
 
 # Configure Gemini
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
-model_name = "gemini-2.5-flash"
+model_name = "gemini-3.6-flash"
 
 # Build a simple prompt to test with sanitized input
 # Validate and sanitize numeric inputs

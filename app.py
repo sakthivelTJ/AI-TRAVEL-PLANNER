@@ -28,7 +28,28 @@ if SUPABASE_URL and SUPABASE_KEY:
         print(f"[DEBUG] Supabase initialization failed: {db_err}")
         supabase = None
 
-GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+from pydantic import BaseModel, Field
+from typing import List, Optional
+
+class Stop(BaseModel):
+    name: str = Field(description="Specific attraction name, restaurant name, or hotel name")
+    address: str = Field(description="Brief address or landmark location")
+    lat: float = Field(description="Latitude coordinate")
+    lng: float = Field(description="Longitude coordinate")
+    time: str = Field(description="Time of stop, e.g. 08:00 AM")
+    description: str = Field(description="Short summary of the activity")
+    transport_to_next: str = Field(description="Mode of transport: WALKING, DRIVING, or CYCLING")
+
+class DayRoute(BaseModel):
+    day: int = Field(description="Day number")
+    stops: List[Stop] = Field(description="Stops for the day in chronological order")
+
+class TravelItinerary(BaseModel):
+    itinerary_markdown: str = Field(description="The complete travel plan in markdown format matching all required sections")
+    days: List[DayRoute] = Field(description="Chronological list of days with their stops")
+
+GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
+
 
 # Configure Gemini API
 client = None
@@ -470,7 +491,8 @@ Ensure that 'lat' and 'lng' are real numeric coordinates representing the exact 
             config=types.GenerateContentConfig(
                 temperature=DEFAULT_TEMPERATURE,
                 max_output_tokens=DEFAULT_MAX_OUTPUT_TOKENS,
-                response_mime_type="application/json"
+                response_mime_type="application/json",
+                response_schema=TravelItinerary
             )
         )
         raw_text = response.text
