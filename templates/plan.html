@@ -700,24 +700,76 @@ block content %}
 
   /* Leaflet Custom Marker & Popup Styles */
   .place-map-icon-custom {
-    background-color: var(--primary) !important;
-    color: white !important;
-    width: 30px !important;
-    height: 30px !important;
-    border-radius: 50% 50% 50% 0;
-    transform: rotate(-45deg);
+    background: transparent !important;
+    border: none !important;
+  }
+
+  .custom-orange-pin {
+    position: relative;
+    width: 42px;
+    height: 42px;
+    background: #f97316; /* Primary orange */
+    border-radius: 50%;
+    border: 2px solid #fdba74; /* Glowing soft orange border */
+    box-shadow: 0 0 12px rgba(249, 115, 22, 0.5), 0 3px 6px rgba(0, 0, 0, 0.4);
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 2px solid white !important;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
   }
 
-  .marker-pin-inner {
-    transform: rotate(45deg);
+  .custom-orange-pin:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 18px rgba(249, 115, 22, 0.8), 0 4px 8px rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+  }
+
+  .pin-photo-wrapper {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: #1e293b;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .pin-photo {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .pin-number-badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    background: #ef4444; /* Crimson red badge */
+    color: white !important;
+    font-size: 0.7rem;
     font-weight: 800;
-    font-size: 0.85rem;
-    margin-top: -2px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1.5px solid white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    z-index: 10;
+  }
+
+  .pin-tip {
+    position: absolute;
+    bottom: -6px;
+    left: calc(50% - 6px);
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 7px solid #f97316;
+    z-index: 1;
   }
 
   .custom-map-popup {
@@ -955,13 +1007,51 @@ block content %}
       activeRoutes = [];
     };
 
+    const getStopThumbnail = (stopName, description) => {
+      const name = (stopName || "").toLowerCase();
+      const desc = (description || "").toLowerCase();
+      const text = `${name} ${desc}`;
+      
+      if (text.includes("eat") || text.includes("food") || text.includes("restaurant") || text.includes("cafe") || text.includes("dinner") || text.includes("lunch") || text.includes("breakfast") || text.includes("dining")) {
+        return "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=80&h=80&fit=crop";
+      }
+      if (text.includes("museum") || text.includes("art") || text.includes("gallery") || text.includes("history") || text.includes("palace") || text.includes("castle") || text.includes("exhibition")) {
+        return "https://images.unsplash.com/photo-1543857778-c4a1a3e0b2eb?w=80&h=80&fit=crop";
+      }
+      if (text.includes("park") || text.includes("garden") || text.includes("forest") || text.includes("nature") || text.includes("hiking") || text.includes("mountain") || text.includes("lake")) {
+        return "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=80&h=80&fit=crop";
+      }
+      if (text.includes("beach") || text.includes("sea") || text.includes("ocean") || text.includes("coast") || text.includes("island") || text.includes("harbor") || text.includes("port")) {
+        return "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=80&h=80&fit=crop";
+      }
+      if (text.includes("shop") || text.includes("market") || text.includes("mall") || text.includes("bazaar") || text.includes("store") || text.includes("boutique")) {
+        return "https://images.unsplash.com/photo-1483985988355-763728e1935b?w=80&h=80&fit=crop";
+      }
+      if (text.includes("hotel") || text.includes("stay") || text.includes("hostel") || text.includes("resort") || text.includes("airbnb")) {
+        return "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=80&h=80&fit=crop";
+      }
+      if (text.includes("airport") || text.includes("train") || text.includes("station") || text.includes("metro") || text.includes("bus") || text.includes("flight") || text.includes("terminal")) {
+        return "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=80&h=80&fit=crop";
+      }
+      return "https://images.unsplash.com/photo-1478147427282-58a87a120781?w=80&h=80&fit=crop";
+    };
+
     const addStopMarker = (leafletMap, legend, stop, coordinate, index, coordinates) => {
+      const thumbnailUrl = getStopThumbnail(stop.name, stop.description);
       const icon = L.divIcon({
         className: "place-map-icon-custom",
-        html: `<div class="marker-pin-inner">${index + 1}</div>`,
-        iconSize: [30, 42],
-        iconAnchor: [15, 42],
-        popupAnchor: [0, -38],
+        html: `
+          <div class="custom-orange-pin">
+            <div class="pin-photo-wrapper">
+              <img src="${thumbnailUrl}" alt="${escapeHtml(stop.name)}" class="pin-photo" onerror="this.src='https://images.unsplash.com/photo-1478147427282-58a87a120781?w=80&h=80&fit=crop'" />
+            </div>
+            <span class="pin-number-badge">${index + 1}</span>
+            <div class="pin-tip"></div>
+          </div>
+        `,
+        iconSize: [42, 48],
+        iconAnchor: [21, 48],
+        popupAnchor: [0, -44],
       });
 
       const marker = L.marker(coordinate, {
@@ -1000,8 +1090,9 @@ block content %}
     };
 
     const addTiles = (leafletMap) => {
-      const tileUrl = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
-      const attribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+      // Force dark mode tiles
+      const tileUrl = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+      const attribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
 
       L.tileLayer(tileUrl, {
         attribution: attribution,
@@ -1048,15 +1139,32 @@ block content %}
         );
         const routeData = await response.json();
         if (routeData.routes?.[0]) {
-          const routeLayer = L.geoJSON(routeData.routes[0].geometry, {
+          const geometry = routeData.routes[0].geometry;
+          
+          // Glow layer
+          const glowLayer = L.geoJSON(geometry, {
             style: {
               color: "#3b82f6",
-              weight: 5,
-              opacity: 0.8,
-              dashArray: "8 6"
+              weight: 8,
+              opacity: 0.35,
+              lineCap: "round",
+              lineJoin: "round"
             },
           }).addTo(leafletMap);
-          activeRoutes.push(routeLayer);
+          activeRoutes.push(glowLayer);
+          
+          // Main route layer
+          const mainLayer = L.geoJSON(geometry, {
+            style: {
+              color: "#60a5fa",
+              weight: 4,
+              opacity: 0.95,
+              lineCap: "round",
+              lineJoin: "round"
+            },
+          }).addTo(leafletMap);
+          activeRoutes.push(mainLayer);
+          
           return routeData.routes[0];
         }
         return null;
@@ -1199,9 +1307,22 @@ block content %}
           `;
           summaryContainer.innerHTML = summaryHtml;
         } else {
-          // fallback polyline routing representation
-          const polylineLayer = L.polyline(mapCoords, { color: '#df765c', weight: 4, dashArray: '8, 8' }).addTo(leafletMap);
-          activeRoutes.push(polylineLayer);
+          // fallback polyline routing representation (glow effect)
+          const glowPolyline = L.polyline(mapCoords, {
+            color: '#ef4444',
+            weight: 7,
+            opacity: 0.35,
+            dashArray: '8, 8'
+          }).addTo(leafletMap);
+          activeRoutes.push(glowPolyline);
+
+          const mainPolyline = L.polyline(mapCoords, {
+            color: '#f97316',
+            weight: 3.5,
+            opacity: 0.9,
+            dashArray: '8, 8'
+          }).addTo(leafletMap);
+          activeRoutes.push(mainPolyline);
 
           summaryContainer.innerHTML = `
             <div class="d-flex justify-content-between align-items-center mb-3">
