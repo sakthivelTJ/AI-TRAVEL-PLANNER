@@ -1187,6 +1187,16 @@ block content %}
       currentRenderSessionId++;
       const sessionId = currentRenderSessionId;
 
+      if (!itineraryDays || itineraryDays.length <= dayIndex) {
+        console.warn("No itinerary days found for index", dayIndex);
+        return;
+      }
+      const dayItem = itineraryDays[dayIndex];
+      if (!dayItem || !dayItem.stops) {
+        console.warn("No dayItem or stops found for dayIndex", dayIndex);
+        return;
+      }
+
       // Update Day Tabs Active State
       const tabs = document.querySelectorAll(".itinerary-day-tab");
       tabs.forEach((tab, index) => {
@@ -1209,17 +1219,16 @@ block content %}
         summaryContainer.innerHTML = `
           <div class="text-center py-3 text-muted small">
             <span class="spinner-border spinner-border-sm me-2" role="status"></span>
-            Mapping Day ${itineraryDays[dayIndex].day} stops and routes...
+            Mapping Day ${dayItem.day} stops and routes...
           </div>
         `;
       }
 
       const activeDaySummary = document.getElementById("active-day-summary");
       if (activeDaySummary) {
-        activeDaySummary.textContent = `Route and stops for Day ${itineraryDays[dayIndex].day}`;
+        activeDaySummary.textContent = `Route and stops for Day ${dayItem.day}`;
       }
 
-      const dayItem = itineraryDays[dayIndex];
       const coords = [];
       const validStops = [];
 

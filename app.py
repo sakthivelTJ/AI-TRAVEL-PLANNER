@@ -47,84 +47,83 @@ MARKDOWN_EXTENSIONS = ['extra', 'nl2br', 'sane_lists', 'fenced_code', 'tables']
 # Fallback content in case API fails
 fallback_content = {
     "content": 
-        """
-        # Travel Plan
-            
-        ## Overview
-        We're experiencing technical difficulties generating your personalized itinerary. Here's a general guide to help you start planning:
+"""# Travel Plan
 
-        ## Day-by-Day Itinerary
+## Overview
+We're experiencing technical difficulties generating your personalized itinerary. Here's a general guide to help you start planning:
 
-        ### Day 1: Arrival & Orientation
-        **Morning**
-        - Arrive at destination
-        - Check into accommodation
-        - Get oriented with the area
+## Day-by-Day Itinerary
 
-        **Afternoon**
-        - Explore nearby attractions
-        - Visit local markets or shopping areas
-        - Try local cuisine for lunch
+### Day 1: Arrival & Orientation
+**Morning**
+- Arrive at destination
+- Check into accommodation
+- Get oriented with the area
 
-        **Evening**
-        - Dinner at a recommended restaurant
-        - Evening stroll or rest
+**Afternoon**
+- Explore nearby attractions
+- Visit local markets or shopping areas
+- Try local cuisine for lunch
 
-        ### Day 2: Main Attractions
-        **Morning**
-        - Visit top-rated tourist attractions
-        - Take guided tours if available
+**Evening**
+- Dinner at a recommended restaurant
+- Evening stroll or rest
 
-        **Afternoon**
-        - Continue sightseeing
-        - Lunch at local eatery
-        - Visit museums or cultural sites
+### Day 2: Main Attractions
+**Morning**
+- Visit top-rated tourist attractions
+- Take guided tours if available
 
-        **Evening**
-        - Dinner and local entertainment
-        - Experience nightlife or cultural shows
+**Afternoon**
+- Continue sightseeing
+- Lunch at local eatery
+- Visit museums or cultural sites
 
-        ### Day 3: Local Experiences
-        **Morning**
-        - Explore local neighborhoods
-        - Visit markets and shops
+**Evening**
+- Dinner and local entertainment
+- Experience nightlife or cultural shows
 
-        **Afternoon**
-        - Try local activities
-        - Lunch at authentic restaurant
-        - Visit hidden gems
+### Day 3: Local Experiences
+**Morning**
+- Explore local neighborhoods
+- Visit markets and shops
 
-        **Evening**
-        - Farewell dinner
-        - Prepare for departure
+**Afternoon**
+- Try local activities
+- Lunch at authentic restaurant
+- Visit hidden gems
 
-        ## Planning Tips
-        - Book accommodations in advance
-        - Research local customs and etiquette
-        - Check travel advisories
-        - Make a list of must-see attractions
-        - Consider local transportation options
+**Evening**
+- Farewell dinner
+- Prepare for departure
 
-        ## Budget Considerations
-        - Accommodation: Varies by preference
-        - Meals: Budget accordingly
-        - Activities: Research costs in advance
-        - Transportation: Factor in local travel
+## Planning Tips
+- Book accommodations in advance
+- Research local customs and etiquette
+- Check travel advisories
+- Make a list of must-see attractions
+- Consider local transportation options
 
-        ## Safety and Preparation
-        - Keep emergency contact numbers handy
-        - Make copies of important documents
-        - Check travel insurance options
-        - Research local healthcare facilities
-        - Stay updated on local conditions
+## Budget Considerations
+- Accommodation: Varies by preference
+- Meals: Budget accordingly
+- Activities: Research costs in advance
+- Transportation: Factor in local travel
 
-        Please try again later for a more detailed, personalized travel plan.""",
-            "sources": [
-                {
-                    "name": "Travel Advisory",
-                    "url": "https://travel.state.gov/content/travel.html"
-                }
-            ]
+## Safety and Preparation
+- Keep emergency contact numbers handy
+- Make copies of important documents
+- Check travel insurance options
+- Research local healthcare facilities
+- Stay updated on local conditions
+
+Please try again later for a more detailed, personalized travel plan.""",
+    "sources": [
+        {
+            "name": "Travel Advisory",
+            "url": "https://travel.state.gov/content/travel.html"
+        }
+    ]
 }
 
 ALLOWED_TAGS = list(bleach.sanitizer.ALLOWED_TAGS) + [
