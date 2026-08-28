@@ -168,54 +168,29 @@ def itinerary_json_to_markdown(response_json, destination, days):
 
     return '\n'.join(lines).strip()
 def search_travel_info(query, destination):
-    """Enhanced Tavily API to search for travel information"""
+    """Tavily API to search for travel information in a single fast request"""
     if not TAVILY_API_KEY:
         print("[DEBUG] Tavily API key is missing; skipping travel research")
         return []
 
     url = "https://api.tavily.com/search"
+    payload = {
+        "api_key": TAVILY_API_KEY,
+        "query": query,
+        "search_depth": "advanced",
+        "max_results": 6
+    }
     
-    # Craft more specific search queries for better results
-    search_queries = [
-        f"top attractions in {destination} travel guide",
-        f"{destination} local restaurants and cuisine guide",
-        f"where to stay in {destination} best neighborhoods",
-        f"{destination} travel tips local customs",
-        f"{destination} transportation options for tourists"
-    ]
-    
-    all_results = []
-    
-    # Make multiple targeted searches
-    for search_query in search_queries:
-        payload = {
-            "api_key": TAVILY_API_KEY,
-            "query": search_query,
-            "search_depth": "advanced",
-            "include_domains": [
-                "tripadvisor.com", "lonelyplanet.com", "timeout.com", 
-                "booking.com", "airbnb.com", "wikitravel.org", 
-                "travel.state.gov", "cntraveler.com", "atlasobscura.com"
-            ],
-            "max_results": 3
-        }
+    try:
+        response = requests.post(url, json=payload, timeout=10)
+        response.raise_for_status()
+        results = response.json()
+        if isinstance(results, dict) and "results" in results:
+            return results["results"]
+    except Exception as e:
+        print(f"Tavily API Error: {e}")
         
-        try:
-            response = requests.post(url, json=payload, timeout=15)
-            response.raise_for_status()
-            results = response.json()
-            if results and "results" in results:
-                all_results.extend(results["results"])
-        except requests.exceptions.RequestException as e:
-            print(f"Tavily API Error for query '{search_query}': {e}")
-    
-    # Deduplicate results based on URL
-    unique_results = {}
-    for result in all_results:
-        if result["url"] not in unique_results:
-            unique_results[result["url"]] = result
-    
-    return list(unique_results.values())
+    return []
 
 def save_travel_plan(travel_params, content, sources):
     """Save the travel plan to Supabase"""

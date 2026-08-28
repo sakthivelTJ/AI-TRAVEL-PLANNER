@@ -2,6 +2,8 @@
 
 An intelligent travel planning application that uses AI to generate personalized itineraries, search hotels, and create detailed travel guides.
 
+Link : https://ai-travel-planner-v821.onrender.com
+
 ## 📋 Features
 
 - **AI-Powered Itinerary Generation** - Get personalized travel plans powered by Google Gemini AI
