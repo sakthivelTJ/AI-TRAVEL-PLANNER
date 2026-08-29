@@ -1052,11 +1052,11 @@ def about():
 
 @app.route('/privacy')
 def privacy():
-    return render_template('privacy.html')
+    return render_template('privacy.html', now=datetime.now())
 
 @app.route('/terms')
 def terms():
-    return render_template('terms.html')
+    return render_template('terms.html', now=datetime.now())
 
 @app.route('/faq')
 def faq():
