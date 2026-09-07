@@ -65,87 +65,100 @@ if GEMINI_API_KEY:
 
 MARKDOWN_EXTENSIONS = ['extra', 'nl2br', 'sane_lists', 'fenced_code', 'tables']
 
-# Fallback content in case API fails
-fallback_content = {
-    "content": 
-"""# Travel Plan
+def get_dynamic_fallback(destination, days, budget="medium", currency="INR"):
+    """Generate dynamic fallback travel plan matching the exact requested number of days."""
+    try:
+        days_count = int(days)
+    except (ValueError, TypeError):
+        days_count = 3
+    days_count = max(1, min(days_count, 30))
 
-## Overview
-We're experiencing technical difficulties generating your personalized itinerary. Here's a general guide to help you start planning:
+    dest = destination or "your destination"
 
-## Day-by-Day Itinerary
-
-### Day 1: Arrival & Orientation
-**Morning**
-- Arrive at destination
-- Check into accommodation
-- Get oriented with the area
-
-**Afternoon**
-- Explore nearby attractions
-- Visit local markets or shopping areas
-- Try local cuisine for lunch
-
-**Evening**
-- Dinner at a recommended restaurant
-- Evening stroll or rest
-
-### Day 2: Main Attractions
-**Morning**
-- Visit top-rated tourist attractions
-- Take guided tours if available
-
-**Afternoon**
-- Continue sightseeing
-- Lunch at local eatery
-- Visit museums or cultural sites
-
-**Evening**
-- Dinner and local entertainment
-- Experience nightlife or cultural shows
-
-### Day 3: Local Experiences
-**Morning**
-- Explore local neighborhoods
-- Visit markets and shops
-
-**Afternoon**
-- Try local activities
-- Lunch at authentic restaurant
-- Visit hidden gems
-
-**Evening**
-- Farewell dinner
-- Prepare for departure
-
-## Planning Tips
-- Book accommodations in advance
-- Research local customs and etiquette
-- Check travel advisories
-- Make a list of must-see attractions
-- Consider local transportation options
-
-## Budget Considerations
-- Accommodation: Varies by preference
-- Meals: Budget accordingly
-- Activities: Research costs in advance
-- Transportation: Factor in local travel
-
-## Safety and Preparation
-- Keep emergency contact numbers handy
-- Make copies of important documents
-- Check travel insurance options
-- Research local healthcare facilities
-- Stay updated on local conditions
-
-Please try again later for a more detailed, personalized travel plan.""",
-    "sources": [
-        {
-            "name": "Travel Advisory",
-            "url": "https://travel.state.gov/content/travel.html"
-        }
+    markdown_lines = [
+        f"# {dest} - {days_count} Day Travel Plan",
+        "",
+        "## Trip Overview",
+        f"- Destination: {dest}",
+        f"- Duration: {days_count} days",
+        f"- Budget: {budget}",
+        "",
+        "## Day-by-Day Itinerary",
+        ""
     ]
-}
+
+    fallback_days_data = []
+    day_themes = [
+        ("Arrival & Essential Highlights", "Explore city center and iconic landmarks"),
+        ("Cultural Immersion & Local Heritage", "Visit top museums, historic sites, and local markets"),
+        ("Hidden Gems & Scenic Views", "Discover off-the-beaten-path spots and scenic viewpoints"),
+        ("Nature & Outdoor Adventure", "Enjoy local parks, gardens, or natural attractions"),
+        ("Culinary & Leisure Exploration", "Sample regional gastronomy and shopping districts"),
+        ("Day Excursion & Surrounding Sights", "Excursion to nearby cultural or natural highlights"),
+        ("Farewell & Memories", "Final sightseeing, souvenirs, and departure preparation")
+    ]
+
+    for d in range(1, days_count + 1):
+        theme_title, theme_desc = day_themes[(d - 1) % len(day_themes)]
+        markdown_lines.extend([
+            f"### Day {d}: {theme_title}",
+            "**Morning (8:00 AM - 12:00 PM)**",
+            f"- Activity 1: Landmark Exploration in {dest}",
+            f"  * Details: {theme_desc}",
+            f"  * Estimated time: 3 hours",
+            f"  * Cost: {currency} 500",
+            "",
+            "**Afternoon (12:00 PM - 6:00 PM)**",
+            f"- Lunch: Local Cuisine Tasting",
+            f"- Activity 2: Popular Attraction & Sightseeing in {dest}",
+            f"  * Details: Cultural walkthrough and photography",
+            f"  * Cost: {currency} 800",
+            "",
+            "**Evening (6:00 PM - 10:00 PM)**",
+            f"- Dinner: Recommended Restaurant in {dest}",
+            f"- Activity 3: Evening Stroll & Night Atmosphere",
+            ""
+        ])
+
+        fallback_days_data.append({
+            "day": d,
+            "stops": [
+                {
+                    "name": f"{dest} City Center - Day {d}",
+                    "address": f"Central District, {dest}",
+                    "lat": 0.0,
+                    "lng": 0.0,
+                    "time": "09:00 AM",
+                    "description": f"Day {d} Morning: {theme_title}",
+                    "transport_to_next": "WALKING"
+                },
+                {
+                    "name": f"Main Landmark - Day {d}",
+                    "address": f"Historic Zone, {dest}",
+                    "lat": 0.0,
+                    "lng": 0.0,
+                    "time": "02:00 PM",
+                    "description": f"Day {d} Afternoon Sightseeing",
+                    "transport_to_next": "WALKING"
+                }
+            ]
+        })
+
+    markdown_lines.extend([
+        "## Accommodation Recommendations",
+        f"- Recommended Stays in {dest} across budget, mid-range, and luxury options.",
+        "",
+        "## Budget Breakdown",
+        f"- Daily Budget: {currency} 2,000 - {currency} 5,000 per day",
+        f"- Total Estimated Cost ({days_count} Days): {currency} {days_count * 2000} - {currency} {days_count * 5000}",
+        "",
+        "## Local Tips & Essentials",
+        "- Research local transportation options.",
+        "- Keep local emergency numbers handy.",
+        "- Check opening hours for key attractions in advance."
+    ])
+
+    return "\n".join(markdown_lines), fallback_days_data
 
 ALLOWED_TAGS = list(bleach.sanitizer.ALLOWED_TAGS) + [
     'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
@@ -162,29 +175,25 @@ def format_markdown_content(content):
 
 def itinerary_json_to_markdown(response_json, destination, days):
     """Normalize Gemini's structured itinerary response for the plan view."""
-    itinerary = response_json.get('day_by_day_itinerary', [])
-    if not isinstance(itinerary, list):
+    days_data = response_json.get('days', []) or response_json.get('day_by_day_itinerary', [])
+    if not isinstance(days_data, list) or not days_data:
         return ''
 
     lines = [f"# {destination} - {days} Day Travel Plan", '', '## Day-by-Day Itinerary', '']
-    for day_item in itinerary:
+    for day_item in days_data:
         if not isinstance(day_item, dict):
             continue
-        day_number = day_item.get('day', len(lines))
-        theme = day_item.get('theme_focus', 'Travel highlights')
-        lines.extend([f"### Day {day_number}: {theme}"])
-        for period in ('morning', 'afternoon', 'evening'):
-            details = day_item.get(period, {})
-            if not isinstance(details, dict):
-                continue
-            time = details.get('time', '')
-            heading = period.capitalize() + (f" ({time})" if time else '')
-            lines.extend([f"**{heading}**"])
-            for label, value in details.items():
-                if label == 'time' or not value:
-                    continue
-                lines.append(f"- {label.replace('_', ' ').capitalize()}: {value}")
-            lines.append('')
+        day_number = day_item.get('day', 1)
+        stops = day_item.get('stops', [])
+        lines.append(f"### Day {day_number}: Travel Highlights")
+        
+        if stops and isinstance(stops, list):
+            for idx, stop in enumerate(stops):
+                stop_name = stop.get('name', f'Stop {idx+1}')
+                time_str = stop.get('time', '')
+                desc = stop.get('description', '')
+                lines.append(f"- **{stop_name}** ({time_str}): {desc}")
+        lines.append('')
 
     return '\n'.join(lines).strip()
 def search_travel_info(query, destination):
@@ -337,10 +346,11 @@ def generate_travel_plan(travel_params):
     travel_params['people'] = people
     
     if not destination:
-        html_fallback = format_markdown_content(fallback_content["content"])
+        fallback_md, fallback_days = get_dynamic_fallback("Your Destination", days, budget, currency)
+        html_fallback = format_markdown_content(fallback_md)
         return {
             "content": html_fallback,
-            "sources": fallback_content["sources"],
+            "sources": [{"type": "days_data", "data": fallback_days}],
             "plan_id": None
         }
     
@@ -391,7 +401,7 @@ def generate_travel_plan(travel_params):
 
 ## Day-by-Day Itinerary
 
-IMPORTANT: Create a detailed itinerary for EACH of the {days} days. For each day include:
+IMPORTANT: You MUST create a complete detailed itinerary section for EACH of the {days} days (from Day 1 up to Day {days}).
 
 - Use {currency} for all cost estimates and display the currency symbol correctly. {budget_limit_prompt}
 
@@ -402,38 +412,27 @@ IMPORTANT: Create a detailed itinerary for EACH of the {days} days. For each day
   * Estimated time: X hours
   * Cost: {currency} XX
 - Activity 2: [Another location]
-  * Details and tips
 
 **Afternoon (12:00 PM - 6:00 PM)**
 - Lunch: [Restaurant recommendation]
 - Activity 3: [Specific location]
-  * Details and tips
-- Activity 4: [Another location]
 
 **Evening (6:00 PM - 10:00 PM)**
 - Dinner: [Restaurant recommendation]
 - Evening activity: [Specific location or experience]
 
-[REPEAT THIS FORMAT FOR ALL {days} DAYS]
+[REPEAT THIS DAY FORMAT FOR ALL {days} DAYS UNTIL DAY {days}]
 
 ## Accommodation Recommendations
 - Option 1: [Hotel/Airbnb name]
-  * Location and why it's good
-  * Price range: {currency} XX-{currency} XX per night
 - Option 2: [Alternative]
 - Option 3: [Budget option]
 
 ## Dining Guide
 - Must-try dishes in {destination}
-- Recommended restaurants:
-  * Budget: [Name] - [Specialty]
-  * Mid-range: [Name] - [Specialty]
-  * Fine dining: [Name] - [Specialty]
 
 ## Transportation
-- Getting to {destination}
-- Getting around the city
-- Estimated costs
+- Getting around {destination}
 
 ## Budget Breakdown
 - Accommodation: {currency} XX per night x {days} nights
@@ -443,41 +442,33 @@ IMPORTANT: Create a detailed itinerary for EACH of the {days} days. For each day
 - **Total Estimated Cost: {currency} XXX - {currency} XXX**
 
 ## Local Tips & Essentials
-- Best time to visit
-- Local customs and etiquette
-- Safety tips
-- Useful phrases
-- Emergency contacts
+- Safety tips and local customs
 
 Additional context from research:
 {search_info}
 
-CRITICAL: You MUST create a complete day-by-day itinerary for all {days} days with specific activities, timings, and locations for morning, afternoon, and evening.
+CRITICAL REQUIREMENT: You MUST generate a day-by-day section for ALL {days} days. In your JSON response, the 'days' array MUST contain exactly {days} day objects (from day 1 to day {days}).
 
 YOU MUST RETURN THE RESPONSE AS A JSON OBJECT WITH THE FOLLOWING SCHEMA:
 {{
-  "itinerary_markdown": "The complete travel plan in markdown format, matching the exact headers, day structure, overview, accommodation, dining, transportation, budget, and local tips sections specified above.",
+  "itinerary_markdown": "The complete travel plan in markdown format for all {days} days.",
   "days": [
     {{
       "day": 1,
       "stops": [
         {{
-          "name": "Specific attraction name, restaurant name, or hotel name",
-          "address": "Brief address or landmark location, e.g. Eiffel Tower, Paris, France",
+          "name": "Specific attraction name or hotel",
+          "address": "Address or landmark location",
           "lat": 48.8584,
           "lng": 2.2945,
-          "time": "e.g. 08:00 AM",
-          "description": "Short summary of the activity",
+          "time": "08:00 AM",
+          "description": "Short summary",
           "transport_to_next": "WALKING"
-        }},
-        ...
+        }}
       ]
-    }},
-    ...
+    }}
   ]
 }}
-
-Ensure that 'lat' and 'lng' are real numeric coordinates representing the exact location of the stop. The order of 'stops' must match the timeline of the day's itinerary. Set 'transport_to_next' to either 'WALKING', 'DRIVING', or 'CYCLING' to specify how to travel to the next stop.
 """
     
     try:
@@ -511,11 +502,14 @@ Ensure that 'lat' and 'lng' are real numeric coordinates representing the exact 
                 itinerary_markdown = itinerary_json_to_markdown(
                     response_json, destination, days
                 )
+            if not days_data and itinerary_markdown:
+                _, fallback_days = get_dynamic_fallback(destination, days, budget, currency)
+                days_data = fallback_days
         except Exception as json_err:
             print(f"[DEBUG] JSON parsing failed: {json_err}")
-            # Use readable fallback content when the model response is incomplete.
-            itinerary_markdown = fallback_content["content"]
-            days_data = []
+            fallback_md, fallback_days = get_dynamic_fallback(destination, days, budget, currency)
+            itinerary_markdown = fallback_md
+            days_data = fallback_days
 
         # Add days_data to sources list as a metadata item
         sources.append({
@@ -538,11 +532,16 @@ Ensure that 'lat' and 'lng' are real numeric coordinates representing the exact 
         print(f"[DEBUG] Gemini API Error: {e}")
         print(f"[DEBUG] Error type: {type(e).__name__}")
         print(f"[DEBUG] Full traceback: {traceback.format_exc()}")
-        print(f"[DEBUG] Returning fallback content (NO ITINERARY)")
-        html_fallback = format_markdown_content(fallback_content["content"])
+        print(f"[DEBUG] Returning dynamic fallback content for {days} days")
+        fallback_md, fallback_days = get_dynamic_fallback(destination, days, budget, currency)
+        sources.append({
+            "type": "days_data",
+            "data": fallback_days
+        })
+        html_fallback = format_markdown_content(fallback_md)
         return {
             "content": html_fallback,
-            "sources": fallback_content["sources"],
+            "sources": sources,
             "plan_id": None
         }
 
