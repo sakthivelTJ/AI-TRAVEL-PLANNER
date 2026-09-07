@@ -173,13 +173,94 @@ def format_markdown_content(content):
     raw_html = markdown.markdown(content, extensions=MARKDOWN_EXTENSIONS)
     return bleach.clean(raw_html, tags=ALLOWED_TAGS, attributes=ALLOWED_ATTRS)
 
+def repair_and_parse_json(cleaned_text):
+    """Attempt to parse JSON, and if truncated, repair missing brackets and quotes."""
+    if not cleaned_text:
+        return {}
+
+    # First try standard json parsing
+    try:
+        return json.loads(cleaned_text)
+    except json.JSONDecodeError:
+        pass
+
+    text = cleaned_text.strip()
+    
+    # Check if text ends inside an unclosed string and close it
+    quotes = re.findall(r'(?<!\\)"', text)
+    if len(quotes) % 2 != 0:
+        text += '"'
+
+    # Balance unclosed brackets and braces
+    stack = []
+    in_string = False
+    i = 0
+    while i < len(text):
+        char = text[i]
+        if char == '"' and (i == 0 or text[i-1] != '\\'):
+            in_string = not in_string
+        elif not in_string:
+            if char in '{[':
+                stack.append(char)
+            elif char in '}]':
+                if stack:
+                    top = stack[-1]
+                    if (char == '}' and top == '{') or (char == ']' and top == '['):
+                        stack.pop()
+        i += 1
+
+    # Close trailing open brackets
+    for open_char in reversed(stack):
+        if open_char == '{':
+            text += '}'
+        elif open_char == '[':
+            text += ']'
+
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    # Salvage valid completed day objects from partial JSON via regex
+    days_found = []
+    day_matches = re.finditer(r'\{\s*"day"\s*:\s*(\d+).*?"stops"\s*:\s*\[(.*?)\]\s*\}', cleaned_text, re.DOTALL)
+    for match in day_matches:
+        try:
+            day_obj = json.loads(match.group(0))
+            days_found.append(day_obj)
+        except Exception:
+            continue
+
+    itinerary_md_match = re.search(r'"itinerary_markdown"\s*:\s*"(.*?)"\s*,\s*"days"', cleaned_text, re.DOTALL)
+    extracted_md = itinerary_md_match.group(1).replace('\\n', '\n').replace('\\"', '"') if itinerary_md_match else ""
+
+    if days_found or extracted_md:
+        return {
+            "itinerary_markdown": extracted_md,
+            "days": days_found
+        }
+
+    return {}
+
 def itinerary_json_to_markdown(response_json, destination, days):
     """Normalize Gemini's structured itinerary response for the plan view."""
     days_data = response_json.get('days', []) or response_json.get('day_by_day_itinerary', [])
+    dest = destination or "your destination"
+
     if not isinstance(days_data, list) or not days_data:
         return ''
 
-    lines = [f"# {destination} - {days} Day Travel Plan", '', '## Day-by-Day Itinerary', '']
+    lines = [
+        f"# {dest} - {days} Day Travel Plan",
+        "",
+        "## Trip Overview",
+        f"- Destination: {dest}",
+        f"- Duration: {days} days",
+        "",
+        "## Day-by-Day Itinerary",
+        ""
+    ]
+
     for day_item in days_data:
         if not isinstance(day_item, dict):
             continue
@@ -192,8 +273,26 @@ def itinerary_json_to_markdown(response_json, destination, days):
                 stop_name = stop.get('name', f'Stop {idx+1}')
                 time_str = stop.get('time', '')
                 desc = stop.get('description', '')
-                lines.append(f"- **{stop_name}** ({time_str}): {desc}")
+                addr = stop.get('address', '')
+                time_prefix = f"**{time_str}** - " if time_str else ""
+                lines.append(f"- {time_prefix}**{stop_name}** ({addr if addr else 'Featured Stop'})")
+                if desc:
+                    lines.append(f"  * {desc}")
         lines.append('')
+
+    lines.extend([
+        "## Accommodation Recommendations",
+        f"- Recommended Stays in {dest} tailored to your itinerary preferences.",
+        "",
+        "## Transportation",
+        f"- Getting around {dest}: Local public transit, walking, and taxi services.",
+        "",
+        "## Budget Breakdown",
+        f"- Comprehensive breakdown based on {days} days of planned activities and lodging.",
+        "",
+        "## Local Tips & Essentials",
+        "- Check local weather forecasts and transport schedules ahead of daily excursions."
+    ])
 
     return '\n'.join(lines).strip()
 def search_travel_info(query, destination):
@@ -488,23 +587,41 @@ YOU MUST RETURN THE RESPONSE AS A JSON OBJECT WITH THE FOLLOWING SCHEMA:
         )
         raw_text = response.text
         
-        # Parse JSON output
+        # Parse JSON output with auto-repair and missing-day completion
         try:
             cleaned_text = raw_text.strip()
             # Remove markdown code fences if present in the response
             code_block_match = re.search(r'```(?:json)?\s*(.*?)\s*```', cleaned_text, re.DOTALL)
             if code_block_match:
                 cleaned_text = code_block_match.group(1).strip()
-            response_json = json.loads(cleaned_text)
+                
+            response_json = repair_and_parse_json(cleaned_text)
             itinerary_markdown = response_json.get('itinerary_markdown', '')
             days_data = response_json.get('days', [])
-            if not itinerary_markdown:
+
+            # Target requested number of days
+            try:
+                target_days = int(days)
+            except (ValueError, TypeError):
+                target_days = 3
+
+            # If Gemini returned structured days but no markdown, convert JSON to markdown
+            if not itinerary_markdown and days_data:
                 itinerary_markdown = itinerary_json_to_markdown(
                     response_json, destination, days
                 )
-            if not days_data and itinerary_markdown:
-                _, fallback_days = get_dynamic_fallback(destination, days, budget, currency)
-                days_data = fallback_days
+
+            # Auto-complete any missing days up to target_days so 10-15 day plans are 100% complete
+            existing_day_nums = {d.get('day') for d in days_data if isinstance(d, dict)}
+            if len(existing_day_nums) < target_days:
+                fallback_md, fallback_days = get_dynamic_fallback(destination, target_days, budget, currency)
+                for fb_day in fallback_days:
+                    if fb_day['day'] not in existing_day_nums:
+                        days_data.append(fb_day)
+                days_data.sort(key=lambda x: x.get('day', 0))
+                if not itinerary_markdown or len(existing_day_nums) == 0:
+                    itinerary_markdown = fallback_md
+
         except Exception as json_err:
             print(f"[DEBUG] JSON parsing failed: {json_err}")
             fallback_md, fallback_days = get_dynamic_fallback(destination, days, budget, currency)

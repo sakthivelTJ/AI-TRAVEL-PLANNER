@@ -13,4 +13,4 @@ SECRET_KEY = os.getenv("SECRET_KEY", "change-me-in-production-32chars!!")
 
 # Default settings
 DEFAULT_TEMPERATURE = 0.7
-DEFAULT_MAX_OUTPUT_TOKENS = 8192
+DEFAULT_MAX_OUTPUT_TOKENS = 16384
