@@ -59,7 +59,7 @@
                 like to go?
               </label>
               <div class="input-group input-group-lg">
-                <span class="input-group-text bg-light border-end-0">
+                <span class="input-group-text border-end-0">
                   <i class="bi bi-search"></i>
                 </span>
                 <input
@@ -212,7 +212,7 @@
                 <i class="bi bi-heart text-primary me-2"></i>Specific Interests
               </label>
               <div class="input-group input-group-lg">
-                <span class="input-group-text bg-light border-end-0">
+                <span class="input-group-text border-end-0">
                   <i class="bi bi-tags"></i>
                 </span>
                 <input
@@ -585,6 +585,60 @@
   h2,
   .card-header h2,
   .card-title {
+    color: #ffffff !important;
+  }
+
+  /* Dark Theme Form Inputs & Controls Alignment */
+  .form-control,
+  .form-select,
+  .input-group-text {
+    background: rgba(15, 23, 42, 0.55) !important;
+    color: #f8fafc !important;
+    border: 1.5px solid rgba(255, 255, 255, 0.12) !important;
+    backdrop-filter: blur(12px);
+  }
+
+  .form-control:focus,
+  .form-select:focus {
+    background: rgba(15, 23, 42, 0.8) !important;
+    color: #ffffff !important;
+    border-color: #6366f1 !important;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25) !important;
+  }
+
+  .form-control::placeholder {
+    color: #94a3b8 !important;
+    opacity: 0.85;
+  }
+
+  /* Style native select dropdown options for dark theme */
+  select.form-select option {
+    background-color: #0f172a !important;
+    color: #f8fafc !important;
+    padding: 10px;
+  }
+
+  .input-group-text {
+    color: #818cf8 !important;
+    background: rgba(15, 23, 42, 0.6) !important;
+  }
+
+  .form-label {
+    color: #e2e8f0 !important;
+    font-weight: 600;
+  }
+
+  .form-text {
+    color: #94a3b8 !important;
+  }
+
+  .advanced-panel {
+    background: rgba(15, 23, 42, 0.4) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: var(--radius-lg);
+  }
+
+  .advanced-heading h3 {
     color: #ffffff !important;
   }
 </style>
